@@ -6,6 +6,7 @@ This repository contains various small code trials and experiments. It serves as
 
 - [Fluid Simulation](https://kavierim.github.io/temp/FluidSimulation.html): An interactive fluid dynamics simulator in HTML/JavaScript
 - [PyScript Example](https://kavierim.github.io/temp/PyScript.html): A demonstration of running Python in the browser using PyScript
+- [Maastokartta](https://kavierim.github.io/temp/maastokartta.html): A topographic map visualization project
 
 ## How to Use
 
@@ -18,6 +19,7 @@ https://kavierim.github.io/temp/[filename].html
 For example:
 - https://kavierim.github.io/temp/FluidSimulation.html
 - https://kavierim.github.io/temp/PyScript.html
+- https://kavierim.github.io/temp/maastokartta.html
 
 ## Contributing
 
