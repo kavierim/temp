@@ -1,14 +1,134 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Fluid Simulator with Gravity, Edge Repulsion, and Margin</title>
+  <title>Enhanced Fluid Simulator</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
     canvas { display: block; }
+    
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      width: 200px;
+      z-index: 100;
+    }
+    
+    #controls h3 {
+      margin-top: 5px;
+      margin-bottom: 5px;
+      font-size: 16px;
+      border-bottom: 1px solid #555;
+    }
+    
+    .control-group {
+      margin-bottom: 10px;
+    }
+    
+    .slider-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 5px 0;
+    }
+    
+    .slider-container label {
+      flex: 1;
+      font-size: 12px;
+    }
+    
+    .slider-container input[type="range"] {
+      flex: 2;
+    }
+    
+    .slider-container .value {
+      width: 30px;
+      font-size: 12px;
+      text-align: right;
+    }
+    
+    button {
+      margin: 5px;
+      padding: 3px 8px;
+      background: #444;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    
+    button:hover {
+      background: #666;
+    }
+    
+    button.active {
+      background: #0a84ff;
+    }
+    
+    #stats {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 8px;
+      border-radius: 5px;
+      font-size: 12px;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
   <canvas id="fluidCanvas"></canvas>
+  
+  <div id="stats">FPS: 0 | Particles: 0</div>
+  
+  <div id="controls">
+    <h3>Simulation Controls</h3>
+    <div class="control-group">
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+    
+    <h3>Parameters</h3>
+    <div class="slider-container">
+      <label for="gravitySlider">Gravity:</label>
+      <input type="range" id="gravitySlider" min="0" max="0.2" step="0.01" value="0.05">
+      <span class="value" id="gravityValue">0.05</span>
+    </div>
+    
+    <div class="slider-container">
+      <label for="heatSlider">Heat Intensity:</label>
+      <input type="range" id="heatSlider" min="0" max="1" step="0.05" value="0.5">
+      <span class="value" id="heatValue">0.5</span>
+    </div>
+    
+    <div class="slider-container">
+      <label for="particleSlider">Particles:</label>
+      <input type="range" id="particleSlider" min="500" max="5000" step="100" value="2000">
+      <span class="value" id="particleValue">2000</span>
+    </div>
+    
+    <h3>Tools</h3>
+    <div class="control-group">
+      <button id="interactBtn" class="active">Interact</button>
+      <button id="heatBtn">Heat</button>
+      <button id="coolBtn">Cool</button>
+      <button id="obstacleBtn">Obstacle</button>
+    </div>
+    
+    <h3>Visualization</h3>
+    <div class="control-group">
+      <button id="showConnectionsBtn" class="active">Connections</button>
+      <button id="showPressureBtn">Pressure</button>
+      <button id="showVelocityBtn">Velocity</button>
+    </div>
+  </div>
+  
   <script>
     const canvas = document.getElementById('fluidCanvas');
     const ctx = canvas.getContext('2d');
@@ -17,7 +137,14 @@
     
     // General Configuration
     const margin = 10;
-    const particleCount = 2000;
+    let particleCount = 2000;
+    let simulationPaused = false;
+    let currentTool = 'interact';
+    
+    // Visualization options
+    let showConnections = true;
+    let showPressure = false;
+    let showVelocity = false;
     
     // Heat Properties
     const maxHeatValue = 3;
@@ -31,7 +158,7 @@
     // Heat Zones
     const heatPlateHeight = 50;
     const heatPlateWidth = window.innerWidth * 0.1;
-    const heatPlateIntensity = 0.5;
+    let heatPlateIntensity = 0.5;
     const heatRiseForce = 0.04;
     const coolingZoneHeight = 50;
     const coolingZoneIntensity = 0.10;
@@ -39,7 +166,7 @@
     // Physics Parameters
     const dampingFactorLiquid = 0.97;
     const dampingFactorGas = 0.99;
-    const gravityFactorLiquid = 0.05;
+    let gravityFactorLiquid = 0.05;
     const gravityFactorGas = 0.001;
     const buoyancyFactorLiquid = 0.5;
     const buoyancyFactorGas = 5;
@@ -94,6 +221,14 @@
       coolGas: null,
       hotGas: null
     };
+
+    // Obstacles
+    const obstacles = [];
+    
+    // Stats
+    let frameCount = 0;
+    let fps = 0;
+    let lastFpsUpdate = 0;
 
     // Set canvas size to window size
     function resizeCanvas() {
@@ -178,14 +313,183 @@
     let lastMouseX = 0;
     let lastMouseY = 0;
     let isMouseDown = false;
+    let heatRadius = 50;
+    let coolRadius = 50;
+    let obstacleRadius = 30;
 
     canvas.addEventListener('mousemove', (e) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
+      
+      // Apply tool effects while mouse is down
+      if (isMouseDown) {
+        applyToolEffect();
+      }
     });
 
-    canvas.addEventListener('mousedown', () => isMouseDown = true);
+    canvas.addEventListener('mousedown', () => {
+      isMouseDown = true;
+      applyToolEffect();
+    });
+    
     canvas.addEventListener('mouseup', () => isMouseDown = false);
+    
+    // Control panel functionality
+    document.getElementById('pauseBtn').addEventListener('click', function() {
+      simulationPaused = !simulationPaused;
+      this.textContent = simulationPaused ? 'Resume' : 'Pause';
+    });
+    
+    document.getElementById('resetBtn').addEventListener('click', function() {
+      resetSimulation();
+    });
+    
+    document.getElementById('gravitySlider').addEventListener('input', function() {
+      gravityFactorLiquid = parseFloat(this.value);
+      document.getElementById('gravityValue').textContent = this.value;
+    });
+    
+    document.getElementById('heatSlider').addEventListener('input', function() {
+      heatPlateIntensity = parseFloat(this.value);
+      document.getElementById('heatValue').textContent = this.value;
+    });
+    
+    document.getElementById('particleSlider').addEventListener('input', function() {
+      const newCount = parseInt(this.value);
+      document.getElementById('particleValue').textContent = newCount;
+      updateParticleCount(newCount);
+    });
+    
+    // Tool buttons
+    const toolButtons = ['interactBtn', 'heatBtn', 'coolBtn', 'obstacleBtn'];
+    toolButtons.forEach(btnId => {
+      document.getElementById(btnId).addEventListener('click', function() {
+        // Deactivate all tool buttons
+        toolButtons.forEach(id => {
+          document.getElementById(id).classList.remove('active');
+        });
+        // Activate clicked button
+        this.classList.add('active');
+        // Set current tool
+        currentTool = btnId.replace('Btn', '');
+      });
+    });
+    
+    // Visualization buttons
+    document.getElementById('showConnectionsBtn').addEventListener('click', function() {
+      showConnections = !showConnections;
+      this.classList.toggle('active');
+    });
+    
+    document.getElementById('showPressureBtn').addEventListener('click', function() {
+      showPressure = !showPressure;
+      this.classList.toggle('active');
+    });
+    
+    document.getElementById('showVelocityBtn').addEventListener('click', function() {
+      showVelocity = !showVelocity;
+      this.classList.toggle('active');
+    });
+    
+    // Apply tool effect based on current tool
+    function applyToolEffect() {
+      switch(currentTool) {
+        case 'heat':
+          applyHeat();
+          break;
+        case 'cool':
+          applyCool();
+          break;
+        case 'obstacle':
+          createObstacle();
+          break;
+        // Interact is the default behavior handled in particle update
+      }
+    }
+    
+    function applyHeat() {
+      // Apply heat to particles within radius
+      for (const particle of particles) {
+        const dx = mouseX - particle.x;
+        const dy = mouseY - particle.y;
+        const distanceSquared = dx * dx + dy * dy;
+        
+        if (distanceSquared < heatRadius * heatRadius) {
+          const distance = Math.sqrt(distanceSquared);
+          const heatFactor = 1 - (distance / heatRadius);
+          particle.heat += heatPlateIntensity * heatFactor * 0.2;
+          
+          // Cap heat
+          if (particle.heat > maxHeatValue) particle.heat = maxHeatValue;
+        }
+      }
+    }
+    
+    function applyCool() {
+      // Apply cooling to particles within radius
+      for (const particle of particles) {
+        const dx = mouseX - particle.x;
+        const dy = mouseY - particle.y;
+        const distanceSquared = dx * dx + dy * dy;
+        
+        if (distanceSquared < coolRadius * coolRadius) {
+          const distance = Math.sqrt(distanceSquared);
+          const coolFactor = 1 - (distance / coolRadius);
+          particle.heat -= coolingZoneIntensity * coolFactor * 0.2;
+          
+          // Cap minimum heat
+          if (particle.heat < 0) particle.heat = 0;
+        }
+      }
+    }
+    
+    function createObstacle() {
+      // Check if clicking near an existing obstacle to prevent overlap
+      for (const obs of obstacles) {
+        const dx = mouseX - obs.x;
+        const dy = mouseY - obs.y;
+        const distanceSquared = dx * dx + dy * dy;
+        
+        // If too close, don't create a new obstacle
+        if (distanceSquared < Math.pow(obstacleRadius + obs.radius, 2)) {
+          return;
+        }
+      }
+      
+      // Create a new obstacle at mouse position
+      obstacles.push({
+        x: mouseX,
+        y: mouseY,
+        radius: obstacleRadius
+      });
+    }
+    
+    function resetSimulation() {
+      // Clear obstacles
+      obstacles.length = 0;
+      
+      // Reset particles
+      particles.length = 0;
+      for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+      }
+    }
+    
+    function updateParticleCount(newCount) {
+      const currentCount = particles.length;
+      
+      if (newCount > currentCount) {
+        // Add particles
+        for (let i = 0; i < newCount - currentCount; i++) {
+          particles.push(new Particle());
+        }
+      } else if (newCount < currentCount) {
+        // Remove particles
+        particles.splice(newCount, currentCount - newCount);
+      }
+      
+      particleCount = newCount;
+    }
 
     // Grid functions for spatial partitioning
     function getGridKey(x, y) {
@@ -365,6 +669,9 @@
           this.y = canvas.height - margin - 2;
           this.vy = -Math.abs(this.vy) * 0.9;
         }
+
+        // Obstacle collision detection
+        this.handleObstacleCollisions();
       }
 
       applyThermalConductivity(nearbyParticles) {
@@ -478,6 +785,38 @@
         }
       }
 
+      handleObstacleCollisions() {
+        for (const obstacle of obstacles) {
+          const dx = this.x - obstacle.x;
+          const dy = this.y - obstacle.y;
+          const distanceSquared = dx * dx + dy * dy;
+          const minDistance = obstacle.radius + this.radius;
+          
+          if (distanceSquared < minDistance * minDistance) {
+            // Collision occurred, push particle away
+            const distance = Math.sqrt(distanceSquared);
+            const overlap = minDistance - distance;
+            
+            // Calculate normal vector
+            const nx = dx / distance;
+            const ny = dy / distance;
+            
+            // Move particle outside obstacle
+            this.x += nx * overlap * 1.1;
+            this.y += ny * overlap * 1.1;
+            
+            // Reflect velocity (with some energy loss)
+            const dotProduct = this.vx * nx + this.vy * ny;
+            this.vx = this.vx - 2 * dotProduct * nx;
+            this.vy = this.vy - 2 * dotProduct * ny;
+            
+            // Add damping
+            this.vx *= 0.8;
+            this.vy *= 0.8;
+          }
+        }
+      }
+
       draw() {
         // Use pre-calculated gradients instead of creating new ones each frame
         const gradient = particleGradients[this.gradientType];
@@ -495,7 +834,7 @@
       
       // New method to draw connections between nearby liquid particles
       drawConnections(nearbyParticles) {
-        if (this.state !== 'liquid') return;
+        if (this.state !== 'liquid' || !showConnections) return;
         
         // Calculate velocity magnitude and direction
         const velocityMagnitude = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
@@ -641,6 +980,31 @@
           }
         }
       }
+
+      // Calculate local pressure based on nearby particles
+      calculatePressure(nearbyParticles) {
+        if (!showPressure) return 0;
+        
+        // Simple pressure model: count nearby particles
+        let pressure = 0;
+        const pressureRadius = this.state === 'liquid' ? 
+                              minDistanceLiquid * 2 : 
+                              minDistanceGas * 2;
+        const pressureRadiusSquared = pressureRadius * pressureRadius;
+        
+        for (const other of nearbyParticles) {
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const distanceSquared = dx * dx + dy * dy;
+          
+          if (distanceSquared < pressureRadiusSquared) {
+            // Particles contribute more pressure when closer
+            pressure += 1 - (Math.sqrt(distanceSquared) / pressureRadius);
+          }
+        }
+        
+        return pressure;
+      }
     }
 
     // Create particles
@@ -654,6 +1018,18 @@
     const physicsDeltaTime = 16; // Target 60fps
     
     function animate(timestamp) {
+      // FPS calculation
+      frameCount++;
+      if (timestamp - lastFpsUpdate > 1000) {
+        fps = Math.round(frameCount * 1000 / (timestamp - lastFpsUpdate));
+        frameCount = 0;
+        lastFpsUpdate = timestamp;
+        
+        // Update stats display
+        document.getElementById('stats').textContent = 
+          `FPS: ${fps} | Particles: ${particles.length} | Obstacles: ${obstacles.length}`;
+      }
+      
       // Calculate time since last physics update
       if (!lastTime) lastTime = timestamp;
       const deltaTime = timestamp - lastTime;
@@ -677,33 +1053,119 @@
       coolGradient.addColorStop(1, 'rgba(100, 150, 255, 0.1)');
       ctx.fillStyle = coolGradient;
       ctx.fillRect(margin, margin, canvas.width - 2 * margin, coolingZoneHeight);
+      
+      // Draw obstacles
+      for (const obstacle of obstacles) {
+        const gradient = ctx.createRadialGradient(
+          obstacle.x, obstacle.y, obstacle.radius * 0.2,
+          obstacle.x, obstacle.y, obstacle.radius
+        );
+        gradient.addColorStop(0, 'rgba(180, 180, 180, 0.8)');
+        gradient.addColorStop(0.8, 'rgba(100, 100, 100, 0.6)');
+        gradient.addColorStop(1, 'rgba(80, 80, 80, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(obstacle.x, obstacle.y, obstacle.radius, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
 
-      // Update physics
-      for (const particle of particles) {
-        particle.update();
-      }
-      
-      // Update spatial grid for optimized collision detection
-      updateGrid();
-      
-      // Apply particle interactions using spatial grid
-      for (const particle of particles) {
-        const nearbyParticles = getNearbyParticles(particle);
-        particle.applyDispersion(nearbyParticles);
-        particle.applySurfaceTension(nearbyParticles); // Apply surface tension
-        particle.checkForEvaporation(nearbyParticles); // Check for evaporation near gas
-        particle.applyThermalConductivity(nearbyParticles);
+      // Only update physics if simulation is not paused
+      if (!simulationPaused) {
+        // Update physics
+        for (const particle of particles) {
+          particle.update();
+        }
+        
+        // Update spatial grid for optimized collision detection
+        updateGrid();
+        
+        // Apply particle interactions using spatial grid
+        for (const particle of particles) {
+          const nearbyParticles = getNearbyParticles(particle);
+          particle.applyDispersion(nearbyParticles);
+          particle.applySurfaceTension(nearbyParticles);
+          particle.checkForEvaporation(nearbyParticles);
+          particle.applyThermalConductivity(nearbyParticles);
+        }
       }
 
-      // First draw connections between particles to ensure they're behind particles
-      for (const particle of particles) {
-        const nearbyParticles = getNearbyParticles(particle);
-        particle.drawConnections(nearbyParticles);
+      // Draw visualization layers
+      // First draw connections between particles
+      if (showConnections) {
+        for (const particle of particles) {
+          const nearbyParticles = getNearbyParticles(particle);
+          particle.drawConnections(nearbyParticles);
+        }
       }
       
-      // Then render particles on top of the connections
+      // Draw pressure visualization
+      if (showPressure) {
+        ctx.globalAlpha = 0.3;
+        for (const particle of particles) {
+          const nearbyParticles = getNearbyParticles(particle);
+          const pressure = particle.calculatePressure(nearbyParticles);
+          
+          if (pressure > 0) {
+            const pressureRadius = Math.min(50, pressure * 10);
+            const gradient = ctx.createRadialGradient(
+              particle.x, particle.y, 0,
+              particle.x, particle.y, pressureRadius
+            );
+            
+            gradient.addColorStop(0, `rgba(255, 0, 0, ${Math.min(0.7, pressure * 0.2)})`);
+            gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+            
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, pressureRadius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
+      
+      // Draw velocity visualization
+      if (showVelocity) {
+        ctx.lineWidth = 1;
+        for (const particle of particles) {
+          const speed = Math.sqrt(particle.vx * particle.vx + particle.vy * particle.vy);
+          const velocityScale = 5;  // Scale velocity vector for visibility
+          
+          ctx.beginPath();
+          ctx.moveTo(particle.x, particle.y);
+          ctx.lineTo(
+            particle.x + particle.vx * velocityScale,
+            particle.y + particle.vy * velocityScale
+          );
+          
+          const hue = particle.state === 'liquid' ? 200 : 60;
+          ctx.strokeStyle = `hsla(${hue}, 100%, 50%, ${Math.min(1, speed)})`;
+          ctx.stroke();
+        }
+      }
+      
+      // Then render particles on top of everything
       for (const particle of particles) {
         particle.draw();
+      }
+      
+      // Draw tool preview
+      if (currentTool === 'heat') {
+        ctx.beginPath();
+        ctx.arc(mouseX, mouseY, heatRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+        ctx.stroke();
+      } else if (currentTool === 'cool') {
+        ctx.beginPath();
+        ctx.arc(mouseX, mouseY, coolRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
+        ctx.stroke();
+      } else if (currentTool === 'obstacle') {
+        ctx.beginPath();
+        ctx.arc(mouseX, mouseY, obstacleRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(200, 200, 200, 0.8)';
+        ctx.stroke();
       }
 
       // Store current mouse position for next frame
