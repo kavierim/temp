@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fluid Simulator with Gravity, Edge Repulsion, and Margin</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="fluidCanvas"></canvas>
+  <script>
+    const canvas = document.getElementById('fluidCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // ===== SIMULATION PARAMETERS =====
+    
+    // General Configuration
+    const margin = 10;
+    const particleCount = 2000;
+    
+    // Heat Properties
+    const maxHeatValue = 3;
+    const heatThreshold = 0.8;
+    const gasificationThreshold = 1.8;
+    const condensationThreshold = 0.0001;
+    const thermalConductivity = 0.20;
+    const heatTransferRadius = 20;
+    const heatTransferRadiusSquared = heatTransferRadius * heatTransferRadius;
+    
+    // Heat Zones
+    const heatPlateHeight = 50;
+    const heatPlateWidth = window.innerWidth * 0.1;
+    const heatPlateIntensity = 0.5;
+    const heatRiseForce = 0.04;
+    const coolingZoneHeight = 50;
+    const coolingZoneIntensity = 0.10;
+    
+    // Physics Parameters
+    const dampingFactorLiquid = 0.97;
+    const dampingFactorGas = 0.99;
+    const gravityFactorLiquid = 0.05;
+    const gravityFactorGas = 0.001;
+    const buoyancyFactorLiquid = 0.5;
+    const buoyancyFactorGas = 5;
+    const minDistanceLiquid = 35;
+    const minDistanceGas = 40;
+    const minDistanceLiquidSquared = minDistanceLiquid * minDistanceLiquid;
+    const minDistanceGasSquared = minDistanceGas * minDistanceGas;
+    const forceMultiplierLiquid = 0.6;
+    const forceMultiplierGas = 0.2;
+    const repulsionDistance = 80;
+    const repulsionForce = 0.35;
+    const conductivityFactorLiquid = 1.0;
+    const conductivityFactorGas = 0.7;
+    
+    // Evaporation parameters
+    const evaporationDistance = 40; // Max distance for evaporation effect
+    const evaporationDistanceSquared = evaporationDistance * evaporationDistance;
+    const evaporationProbability = 0.01; // Base probability per frame
+    const evaporationCoolingFactor = 0.3; // How much the gas cools when evaporating liquid
+    const evaporationHeatTransfer = 0.5; // How much heat is transferred from gas to liquid
+    
+    // Surface tension parameters
+    const surfaceTensionDistance = 60; // Maximum distance for surface tension
+    const surfaceTensionDistanceSquared = surfaceTensionDistance * surfaceTensionDistance;
+    const surfaceTensionStrength = 0.05; // Strength of surface tension force
+    const minSurfaceTensionDistance = minDistanceLiquid * 1.2; // Minimum distance for surface tension
+    const minSurfaceTensionDistanceSquared = minSurfaceTensionDistance * minSurfaceTensionDistance;
+    
+    // Visual Parameters
+    const baseParticleRadius = 3;
+    const liquidHaloSize = 2.5;
+    const gasHaloSize = 3.5;
+    const liquidHaloOpacity = 0.3;
+    const gasHaloOpacity = 0.2;
+    
+    // Liquid connection parameters
+    const liquidConnectionDistance = 40; // Distance at which to connect particles
+    const liquidConnectionDistanceSquared = liquidConnectionDistance * liquidConnectionDistance;
+    const liquidConnectionOpacity = 0.15; // Opacity of connections
+    const flowIndicatorLength = 8; // Length of flow direction indicators
+    const flowIndicatorThreshold = 0.8; // Minimum velocity to show flow indicators
+
+    // Spatial partitioning grid
+    const gridCellSize = Math.max(minDistanceGas, heatTransferRadius);
+    let grid = {};
+    
+    // Cached gradients for common particle states
+    const particleGradients = {
+      coolLiquid: null,
+      warmLiquid: null,
+      hotLiquid: null,
+      coolGas: null,
+      hotGas: null
+    };
+
+    // Set canvas size to window size
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      // Clear the grid when resizing
+      grid = {};
+      // Initialize cached gradients after resize
+      initGradients();
+    }
+    
+    // Initialize pre-calculated gradients
+    function initGradients() {
+      // Calculate offscreen canvases for particle gradients
+      // These will be reused instead of creating new gradients each frame
+      for (const key in particleGradients) {
+        const offscreenCanvas = document.createElement('canvas');
+        const maxRadius = baseParticleRadius * Math.max(liquidHaloSize, gasHaloSize) * 2;
+        offscreenCanvas.width = offscreenCanvas.height = maxRadius * 2 + 10;
+        const offCtx = offscreenCanvas.getContext('2d');
+        const centerX = offscreenCanvas.width / 2;
+        const centerY = offscreenCanvas.height / 2;
+        
+        let color, haloSize, opacity;
+        
+        switch (key) {
+          case 'coolLiquid':
+            color = {r: 50, g: 100, b: 255};
+            haloSize = baseParticleRadius * liquidHaloSize;
+            opacity = liquidHaloOpacity;
+            break;
+          case 'warmLiquid':
+            color = {r: 255, g: 200, b: 50};
+            haloSize = baseParticleRadius * liquidHaloSize * 1.2;
+            opacity = liquidHaloOpacity;
+            break;
+          case 'hotLiquid':
+            color = {r: 255, g: 50, b: 0};
+            haloSize = baseParticleRadius * liquidHaloSize * 1.4;
+            opacity = liquidHaloOpacity;
+            break;
+          case 'coolGas':
+            color = {r: 100, g: 200, b: 255};
+            haloSize = baseParticleRadius * gasHaloSize;
+            opacity = gasHaloOpacity;
+            break;
+          case 'hotGas':
+            color = {r: 255, g: 200, b: 50};
+            haloSize = baseParticleRadius * gasHaloSize;
+            opacity = gasHaloOpacity;
+            break;
+        }
+        
+        const gradient = offCtx.createRadialGradient(
+          centerX, centerY, baseParticleRadius * 0.5,
+          centerX, centerY, haloSize
+        );
+        
+        gradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${opacity})`);
+        gradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
+        
+        offCtx.beginPath();
+        offCtx.arc(centerX, centerY, haloSize, 0, Math.PI * 2);
+        offCtx.fillStyle = gradient;
+        offCtx.fill();
+        
+        offCtx.beginPath();
+        offCtx.arc(centerX, centerY, baseParticleRadius, 0, Math.PI * 2);
+        offCtx.fillStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${opacity * 2})`;
+        offCtx.fill();
+        
+        particleGradients[key] = offscreenCanvas;
+      }
+    }
+    
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Mouse interaction
+    let mouseX = 0;
+    let mouseY = 0;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    let isMouseDown = false;
+
+    canvas.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    canvas.addEventListener('mousedown', () => isMouseDown = true);
+    canvas.addEventListener('mouseup', () => isMouseDown = false);
+
+    // Grid functions for spatial partitioning
+    function getGridKey(x, y) {
+      const gridX = Math.floor(x / gridCellSize);
+      const gridY = Math.floor(y / gridCellSize);
+      return `${gridX},${gridY}`;
+    }
+    
+    function addToGrid(particle) {
+      const key = getGridKey(particle.x, particle.y);
+      if (!grid[key]) {
+        grid[key] = [];
+      }
+      grid[key].push(particle);
+    }
+    
+    function updateGrid() {
+      // Clear the grid
+      grid = {};
+      // Add all particles to the grid
+      for (const particle of particles) {
+        addToGrid(particle);
+      }
+    }
+    
+    function getNearbyParticles(particle) {
+      const x = particle.x;
+      const y = particle.y;
+      const gridX = Math.floor(x / gridCellSize);
+      const gridY = Math.floor(y / gridCellSize);
+      
+      const nearby = [];
+      
+      // Check 9 cells (current cell and 8 surrounding cells)
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          const key = `${gridX + i},${gridY + j}`;
+          if (grid[key]) {
+            nearby.push(...grid[key]);
+          }
+        }
+      }
+      
+      return nearby.filter(p => p !== particle);
+    }
+
+    // Particle class
+    class Particle {
+      constructor() {
+        this.x = Math.random() * (canvas.width - 2 * margin) + margin;
+        this.y = Math.random() * (canvas.height - 2 * margin) + margin;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = (Math.random() - 0.5) * 2;
+        this.baseRadius = baseParticleRadius;
+        this.radius = this.baseRadius;
+        this.heat = 0;
+        this.state = 'liquid';
+        this.gradientType = 'coolLiquid';
+      }
+
+      update() {
+        // Mouse interaction
+        const dx = this.x - mouseX;
+        const dy = this.y - mouseY;
+        const distanceSquared = dx * dx + dy * dy;
+        const maxDistance = isMouseDown ? 200 : 100;
+        const maxDistanceSquared = maxDistance * maxDistance;
+        const forceStrength = isMouseDown ? 0.2 : 0.1;
+
+        if (distanceSquared < maxDistanceSquared) {
+          const distance = Math.sqrt(distanceSquared);
+          const angle = Math.atan2(dy, dx);
+          const force = (1 - distance / maxDistance) * forceStrength;
+
+          // Add velocity based on mouse movement
+          const deltaX = mouseX - lastMouseX;
+          const deltaY = mouseY - lastMouseY;
+
+          this.vx += deltaX * force;
+          this.vy += deltaY * force;
+        }
+
+        // Apply velocity
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Damping based on state
+        const dampingFactor = this.state === 'gas' ? dampingFactorGas : dampingFactorLiquid;
+        this.vx *= dampingFactor;
+        this.vy *= dampingFactor;
+        
+        // Heat plate effect (center bottom heating)
+        const heatPlateLeft = (canvas.width - heatPlateWidth) / 2;
+        const heatPlateRight = heatPlateLeft + heatPlateWidth;
+        if (this.y > canvas.height - margin - heatPlateHeight && 
+            this.x > heatPlateLeft && this.x < heatPlateRight) {
+          // Increase heat based on proximity to bottom
+          const heatFactor = 1 - ((canvas.height - margin - this.y) / heatPlateHeight);
+          this.heat += heatPlateIntensity * heatFactor;
+          
+          // Cap heat value
+          if (this.heat > maxHeatValue) this.heat = maxHeatValue;
+        } 
+        // Cooling zone effect (top cooling)
+        else if (this.y < margin + coolingZoneHeight) {
+          // Decrease heat based on proximity to top
+          const coolingFactor = 1 - ((this.y - margin) / coolingZoneHeight);
+          this.heat -= coolingZoneIntensity * coolingFactor;
+          
+          // Prevent negative heat values
+          if (this.heat < 0) this.heat = 0;
+        }
+        // Natural decay in middle area
+        else {
+          // Heat decay - slower for gas to maintain gas state longer
+          this.heat *= this.state === 'gas' ? 0.985 : 0.97;
+        }
+
+        // Phase change: liquid to gas
+        if (this.state === 'liquid' && this.heat > gasificationThreshold) {
+          this.state = 'gas';
+          // Add a bit of upward velocity when turning to gas
+          this.vy -= 1 + Math.random();
+          // Play with physics to simulate gas expansion
+          this.vx += (Math.random() - 0.5) * 0.5;
+        }
+        // Phase change: gas to liquid
+        else if (this.state === 'gas' && this.heat < condensationThreshold) {
+          this.state = 'liquid';
+        }
+
+        // Update radius based on state
+        if (this.state === 'gas') {
+          // Larger radius for gas, varies slightly with heat
+          const heatFactor = Math.min(1, this.heat / maxHeatValue);
+          this.radius = this.baseRadius * (1.8 + heatFactor * 0.5);
+          this.gradientType = this.heat > heatThreshold ? 'hotGas' : 'coolGas';
+        } else {
+          // Regular radius for liquid, maybe slightly larger when hot
+          const heatFactor = Math.min(1, this.heat / gasificationThreshold);
+          this.radius = this.baseRadius * (1 + heatFactor * 0.2);
+          
+          if (this.heat > heatThreshold) {
+            this.gradientType = 'hotLiquid';
+          } else if (this.heat > heatThreshold * 0.5) {
+            this.gradientType = 'warmLiquid';
+          } else {
+            this.gradientType = 'coolLiquid';
+          }
+        }
+
+        // Apply thermal dynamics - heated particles tend to rise, gas rises faster
+        const buoyancyFactor = this.state === 'gas' ? buoyancyFactorGas : buoyancyFactorLiquid;
+        this.vy -= this.heat * heatRiseForce * buoyancyFactor;
+
+        // Gravity - less for gas particles
+        const gravityFactor = this.state === 'gas' ? gravityFactorGas : gravityFactorLiquid;
+        this.vy += gravityFactor;
+
+        // First apply edge repulsion to keep particles away from boundaries
+        this.applyEdgeRepulsion();
+
+        // Then apply hard boundary constraints with stronger bounce
+        if (this.x < margin) {
+          this.x = margin + 2; // Push it a bit more inside
+          this.vx = Math.abs(this.vx) * 0.9; // Ensure positive velocity away from edge
+        }
+        if (this.x > canvas.width - margin) {
+          this.x = canvas.width - margin - 2;
+          this.vx = -Math.abs(this.vx) * 0.9; // Ensure negative velocity away from edge
+        }
+        if (this.y < margin) {
+          this.y = margin + 2;
+          this.vy = Math.abs(this.vy) * 0.9;
+        }
+        if (this.y > canvas.height - margin) {
+          this.y = canvas.height - margin - 2;
+          this.vy = -Math.abs(this.vy) * 0.9;
+        }
+      }
+
+      applyThermalConductivity(nearbyParticles) {
+        // Adjust thermal conductivity based on state
+        const conductivityFactor = this.state === 'gas' ? conductivityFactorGas : conductivityFactorLiquid;
+        
+        for (const otherParticle of nearbyParticles) {
+          const dx = this.x - otherParticle.x;
+          const dy = this.y - otherParticle.y;
+          const distanceSquared = dx * dx + dy * dy;
+          
+          // Expanded radius for gas particles
+          const effectiveRadius = heatTransferRadius * 
+            ((this.state === 'gas' || otherParticle.state === 'gas') ? 1.3 : 1.0);
+          const effectiveRadiusSquared = effectiveRadius * effectiveRadius;
+          
+          // Only transfer heat within the effective radius
+          if (distanceSquared < effectiveRadiusSquared) {
+            // Calculate heat difference
+            const heatDiff = this.heat - otherParticle.heat;
+            
+            const distance = Math.sqrt(distanceSquared);
+            // Transfer heat from hotter to cooler particle
+            const transferFactor = (1 - distance / effectiveRadius) * 
+              thermalConductivity * conductivityFactor;
+            
+            if (heatDiff > 0) {
+              // This particle is hotter, transfer heat to other particle
+              const transferAmount = heatDiff * transferFactor;
+              this.heat -= transferAmount;
+              otherParticle.heat += transferAmount;
+            }
+          }
+        }
+      }
+
+      applyDispersion(nearbyParticles) {
+        // Adjust repulsion distance based on state (gas has larger effect radius)
+        const minDistanceSquared = this.state === 'gas' ? minDistanceGasSquared : minDistanceLiquidSquared;
+        // Adjust force based on state (gas has weaker repulsion)
+        const forceMultiplier = this.state === 'gas' ? forceMultiplierGas : forceMultiplierLiquid;
+        
+        for (const otherParticle of nearbyParticles) {
+          const dx = this.x - otherParticle.x;
+          const dy = this.y - otherParticle.y;
+          const distanceSquared = dx * dx + dy * dy;
+
+          if (distanceSquared < minDistanceSquared && distanceSquared > 0) {
+            // Calculate repulsion force
+            const distance = Math.sqrt(distanceSquared);
+            const minDistance = this.state === 'gas' ? minDistanceGas : minDistanceLiquid;
+            const force = forceMultiplier * (1 - distance / minDistance);
+            const angle = Math.atan2(dy, dx);
+            this.vx += Math.cos(angle) * force;
+            this.vy += Math.sin(angle) * force;
+          }
+        }
+      }
+
+      applySurfaceTension(nearbyParticles) {
+        if (this.state !== 'liquid') return;
+        
+        for (const other of nearbyParticles) {
+          if (other.state !== 'liquid') continue;
+          
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const distanceSquared = dx * dx + dy * dy;
+          
+          // Apply surface tension in a medium range:
+          // - Too close: particles already repel each other via dispersion
+          // - Medium range: apply attractive force (surface tension)
+          // - Too far: no interaction
+          if (distanceSquared > minSurfaceTensionDistanceSquared && 
+              distanceSquared < surfaceTensionDistanceSquared) {
+            const distance = Math.sqrt(distanceSquared);
+            // Cohesion force that decreases with distance
+            const force = surfaceTensionStrength * (1 - distance / surfaceTensionDistance);
+            const angle = Math.atan2(dy, dx);
+            
+            this.vx += Math.cos(angle) * force;
+            this.vy += Math.sin(angle) * force;
+          }
+        }
+      }
+
+      applyEdgeRepulsion() {
+        // Left edge
+        if (this.x < margin + repulsionDistance) {
+          const distanceFromEdge = this.x - margin;
+          const forceFactor = 1 - (distanceFromEdge / repulsionDistance);
+          this.vx += repulsionForce * forceFactor * forceFactor;
+        }
+        // Right edge
+        if (this.x > canvas.width - margin - repulsionDistance) {
+          const distanceFromEdge = canvas.width - margin - this.x;
+          const forceFactor = 1 - (distanceFromEdge / repulsionDistance);
+          this.vx -= repulsionForce * forceFactor * forceFactor;
+        }
+        // Top edge
+        if (this.y < margin + repulsionDistance) {
+          const distanceFromEdge = this.y - margin;
+          const forceFactor = 1 - (distanceFromEdge / repulsionDistance);
+          this.vy += repulsionForce * forceFactor * forceFactor;
+        }
+        // Bottom edge
+        if (this.y > canvas.height - margin - repulsionDistance) {
+          const distanceFromEdge = canvas.height - margin - this.y;
+          const forceFactor = 1 - (distanceFromEdge / repulsionDistance);
+          this.vy -= repulsionForce * forceFactor * forceFactor;
+        }
+      }
+
+      draw() {
+        // Use pre-calculated gradients instead of creating new ones each frame
+        const gradient = particleGradients[this.gradientType];
+        if (gradient) {
+          const radius = this.state === 'gas' ? this.radius * gasHaloSize : this.radius * liquidHaloSize;
+          ctx.drawImage(
+            gradient, 
+            this.x - radius, 
+            this.y - radius, 
+            radius * 2, 
+            radius * 2
+          );
+        }
+      }
+      
+      // New method to draw connections between nearby liquid particles
+      drawConnections(nearbyParticles) {
+        if (this.state !== 'liquid') return;
+        
+        // Calculate velocity magnitude and direction
+        const velocityMagnitude = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+        
+        for (const other of nearbyParticles) {
+          if (other.state !== 'liquid') continue;
+          
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const distanceSquared = dx * dx + dy * dy;
+          
+          if (distanceSquared < liquidConnectionDistanceSquared) {
+            // Draw connection between liquid particles
+            const distance = Math.sqrt(distanceSquared);
+            const opacity = liquidConnectionOpacity * (1 - distance / liquidConnectionDistance);
+            
+            // Get color based on average heat
+            const avgHeat = (this.heat + other.heat) / 2;
+            let color;
+            
+            if (avgHeat > heatThreshold) {
+              color = {r: 255, g: 50, b: 0}; // Hot
+            } else if (avgHeat > heatThreshold * 0.5) {
+              color = {r: 255, g: 200, b: 50}; // Warm
+            } else {
+              color = {r: 50, g: 100, b: 255}; // Cool
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(this.x, this.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, ${opacity})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+        
+        // Draw flow direction indicator if velocity is above threshold
+        if (velocityMagnitude > flowIndicatorThreshold) {
+          const normalizedVx = this.vx / velocityMagnitude;
+          const normalizedVy = this.vy / velocityMagnitude;
+          
+          // Draw flow indicator line
+          ctx.beginPath();
+          ctx.moveTo(this.x, this.y);
+          ctx.lineTo(
+            this.x + normalizedVx * flowIndicatorLength,
+            this.y + normalizedVy * flowIndicatorLength
+          );
+          
+          // Color based on heat
+          let color;
+          if (this.heat > heatThreshold) {
+            color = {r: 255, g: 50, b: 0}; // Hot
+          } else if (this.heat > heatThreshold * 0.5) {
+            color = {r: 255, g: 200, b: 50}; // Warm
+          } else {
+            color = {r: 50, g: 100, b: 255}; // Cool
+          }
+          
+          ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.5)`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+
+      // Check for nearby gas particles that could cause evaporation
+      checkForEvaporation(nearbyParticles) {
+        // Only liquid particles can evaporate
+        if (this.state !== 'liquid') return;
+        
+        // Count nearby gas particles and find the closest one
+        let nearbyGasCount = 0;
+        let closestGasParticle = null;
+        let closestDistanceSquared = Infinity;
+        
+        for (const other of nearbyParticles) {
+          if (other.state !== 'gas') continue;
+          
+          const dx = other.x - this.x;
+          const dy = other.y - this.y;
+          const distanceSquared = dx * dx + dy * dy;
+          
+          if (distanceSquared < evaporationDistanceSquared) {
+            nearbyGasCount++;
+            
+            if (distanceSquared < closestDistanceSquared) {
+              closestDistanceSquared = distanceSquared;
+              closestGasParticle = other;
+            }
+          }
+        }
+        
+        // If no gas particles are nearby, no evaporation occurs
+        if (nearbyGasCount === 0) return;
+        
+        // Calculate evaporation probability based on:
+        // 1. Number of nearby gas particles
+        // 2. Heat of this liquid particle (hotter = more likely to evaporate)
+        // 3. Distance to closest gas particle
+        const heatFactor = this.heat / gasificationThreshold; // 0 to 1 based on how hot it is
+        const distanceFactor = 1 - Math.sqrt(closestDistanceSquared) / evaporationDistance;
+        const evapChance = evaporationProbability * 
+                         (1 + heatFactor) * 
+                         (1 + distanceFactor) * 
+                         Math.min(5, nearbyGasCount / 2);
+        
+        // Check if evaporation occurs
+        if (Math.random() < evapChance) {
+          // Convert to gas
+          this.state = 'gas';
+          
+          // Add upward velocity
+          this.vy -= 0.5 + Math.random() * 0.5;
+          
+          // Add some random velocity
+          this.vx += (Math.random() - 0.5) * 0.8;
+          
+          // Transfer some heat from nearby gas particles to this particle
+          if (closestGasParticle) {
+            // Heat this particle
+            const heatTransfer = closestGasParticle.heat * evaporationHeatTransfer;
+            this.heat += heatTransfer;
+            
+            // Cool the gas particle
+            closestGasParticle.heat -= heatTransfer * evaporationCoolingFactor;
+            if (closestGasParticle.heat < 0) closestGasParticle.heat = 0;
+            
+            // Also cool other nearby gas particles a bit
+            for (const other of nearbyParticles) {
+              if (other.state === 'gas' && other !== closestGasParticle) {
+                const dx = other.x - this.x;
+                const dy = other.y - this.y;
+                const distanceSquared = dx * dx + dy * dy;
+                
+                if (distanceSquared < evaporationDistanceSquared) {
+                  const distanceFactor = 1 - Math.sqrt(distanceSquared) / evaporationDistance;
+                  other.heat -= distanceFactor * evaporationCoolingFactor * 0.3;
+                  if (other.heat < 0) other.heat = 0;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Create particles
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle());
+    }
+
+    // Animation loop with physics and rendering separated
+    let lastTime = 0;
+    const physicsDeltaTime = 16; // Target 60fps
+    
+    function animate(timestamp) {
+      // Calculate time since last physics update
+      if (!lastTime) lastTime = timestamp;
+      const deltaTime = timestamp - lastTime;
+      lastTime = timestamp;
+      
+      // Clear the screen with semi-transparent black for motion trails
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw heat plate (center bottom)
+      const heatPlateLeft = (canvas.width - heatPlateWidth) / 2;
+      const heatGradient = ctx.createLinearGradient(0, canvas.height - margin - heatPlateHeight, 0, canvas.height - margin);
+      heatGradient.addColorStop(0, 'rgba(255, 100, 20, 0.1)');
+      heatGradient.addColorStop(1, 'rgba(255, 50, 0, 0.3)');
+      ctx.fillStyle = heatGradient;
+      ctx.fillRect(heatPlateLeft, canvas.height - margin - heatPlateHeight, heatPlateWidth, heatPlateHeight);
+      
+      // Draw cooling zone (top)
+      const coolGradient = ctx.createLinearGradient(0, margin, 0, margin + coolingZoneHeight);
+      coolGradient.addColorStop(0, 'rgba(50, 100, 255, 0.3)');
+      coolGradient.addColorStop(1, 'rgba(100, 150, 255, 0.1)');
+      ctx.fillStyle = coolGradient;
+      ctx.fillRect(margin, margin, canvas.width - 2 * margin, coolingZoneHeight);
+
+      // Update physics
+      for (const particle of particles) {
+        particle.update();
+      }
+      
+      // Update spatial grid for optimized collision detection
+      updateGrid();
+      
+      // Apply particle interactions using spatial grid
+      for (const particle of particles) {
+        const nearbyParticles = getNearbyParticles(particle);
+        particle.applyDispersion(nearbyParticles);
+        particle.applySurfaceTension(nearbyParticles); // Apply surface tension
+        particle.checkForEvaporation(nearbyParticles); // Check for evaporation near gas
+        particle.applyThermalConductivity(nearbyParticles);
+      }
+
+      // First draw connections between particles to ensure they're behind particles
+      for (const particle of particles) {
+        const nearbyParticles = getNearbyParticles(particle);
+        particle.drawConnections(nearbyParticles);
+      }
+      
+      // Then render particles on top of the connections
+      for (const particle of particles) {
+        particle.draw();
+      }
+
+      // Store current mouse position for next frame
+      lastMouseX = mouseX;
+      lastMouseY = mouseY;
+
+      requestAnimationFrame(animate);
+    }
+    
+    // Start the animation
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
