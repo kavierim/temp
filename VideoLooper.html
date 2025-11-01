@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video-Audio Loop-Merger</title>
+    <!-- 1. Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Use the Inter font family -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom style for drag-over state */
+        .drag-over {
+            border-color: #3b82f6; /* blue-500 */
+            background-color: #eff6ff; /* blue-50 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Application Card -->
+    <div class="bg-white p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-lg">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-2">
+            Video-Audio Loop-Merger
+        </h1>
+        <p class="text-gray-600 text-center mb-6 text-sm sm:text-base">
+            Loop a video for the full duration of an audio track. Runs 100% in your browser.
+        </p>
+
+        <!-- 
+          STATE 1: File Input (Default)
+          This is the drop zone and file status area.
+        -->
+        <div id="file-input-state">
+            <!-- The 'drop-zone' is a label for the hidden file input -->
+            <label id="drop-zone" for="file-input" class="group block cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-8 text-center transition hover:bg-gray-50">
+                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span class="mt-2 block font-semibold text-gray-700">
+                    Drag & drop files here
+                </span>
+                <span class="mt-1 block text-sm text-gray-500">
+                    or click to select (MP4 & MP3)
+                </span>
+            </label>
+            <!-- Hidden actual file input -->
+            <input type="file" id="file-input" multiple accept="video/mp4,audio/mpeg" class="hidden">
+
+            <!-- File Status Indicators -->
+            <div class="mt-6 space-y-3">
+                <div id="video-status-ui" class="flex items-center justify-between rounded-lg bg-gray-50 p-3">
+                    <span class="font-medium text-gray-700">Video:</span>
+                    <span id="video-status" class="text-sm text-gray-500 italic">No MP4 file selected</span>
+                </div>
+                <div id="audio-status-ui" class="flex items-center justify-between rounded-lg bg-gray-50 p-3">
+                    <span class="font-medium text-gray-700">Audio:</span>
+                    <span id="audio-status" class="text-sm text-gray-500 italic">No MP3 file selected</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+          STATE 2: Processing
+          This section is hidden by default and shown during processing.
+        -->
+        <div id="processing-state" class="hidden">
+            <div class="text-center">
+                <span id="status-message" class="text-lg font-medium text-gray-700">Processing...</span>
+                <p class="text-sm text-gray-500 mt-1">This may take a few moments. Please keep this tab open.</p>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-6 overflow-hidden">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+            </div>
+            <p id="progress-text" class="text-center text-sm font-medium text-gray-600 mt-2">0%</p>
+        </div>
+
+        <!-- 
+          STATE 3: Result
+          This section is hidden by default and shown on completion.
+        -->
+        <div id="result-state" class="hidden">
+            <h2 class="text-xl font-semibold text-center text-green-600 mb-4">Complete!</h2>
+            <!-- The final video player -->
+            <video id="result-video" class="w-full rounded-lg shadow" controls></video>
+            <p class="text-center text-sm text-gray-500 mt-4">
+                Right-click the video and select "Save video as..." to download.
+            </p>
+            <button id="reset-button" class="w-full mt-4 rounded-md bg-blue-600 px-4 py-2 text-white font-medium shadow-sm transition hover:bg-blue-700">
+                Create Another
+            </button>
+        </div>
+    </div>
+
+    <!-- 
+      Invisible elements needed for processing.
+      - source-video: Plays the looping MP4 (muted).
+      - render-canvas: Frames from 'source-video' are drawn here to create a stream.
+    -->
+    <video id="source-video" loop muted class="hidden"></video>
+    <canvas id="render-canvas" class="hidden"></canvas>
+
+
+    <!-- 
+      JavaScript Logic
+      All processing happens here, in the browser.
+    -->
+    <script>
+        // --- DOM Element References ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        
+        // State 1: Input
+        const fileInputState = document.getElementById('file-input-state');
+        const videoStatusUI = document.getElementById('video-status-ui');
+        const audioStatusUI = document.getElementById('audio-status-ui');
+        const videoStatus = document.getElementById('video-status');
+        const audioStatus = document.getElementById('audio-status');
+
+        // State 2: Processing
+        const processingState = document.getElementById('processing-state');
+        const statusMessage = document.getElementById('status-message');
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+
+        // State 3: Result
+        const resultState = document.getElementById('result-state');
+        const resultVideo = document.getElementById('result-video');
+        const resetButton = document.getElementById('reset-button');
+
+        // Invisible Processing Elements
+        const sourceVideo = document.getElementById('source-video');
+        const canvas = document.getElementById('render-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Global State Variables ---
+        let videoFile = null;
+        let audioFile = null;
+        let audioBuffer = null;
+        let audioContext = null;
+        
+        let animationFrameId = null;
+        let progressInterval = null;
+
+        // --- Drag and Drop Event Handlers ---
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            fileInput.files = e.dataTransfer.files;
+            handleFiles(fileInput.files);
+        });
+
+        // --- File Input Change Handler ---
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+        
+        // --- Reset Button Handler ---
+        resetButton.addEventListener('click', () => {
+            // Reset global state
+            videoFile = null;
+            audioFile = null;
+            audioBuffer = null;
+            if (audioContext && audioContext.state !== 'closed') { // Check if context is already closed
+                audioContext.close();
+            }
+            audioContext = null;
+            
+            // Reset UI
+            videoStatus.textContent = 'No MP4 file selected';
+            videoStatus.classList.add('italic', 'text-gray-500');
+            videoStatusUI.classList.remove('border-green-500', 'border-2');
+
+            audioStatus.textContent = 'No MP3 file selected';
+            audioStatus.classList.add('italic', 'text-gray-500');
+            audioStatusUI.classList.remove('border-green-500', 'border-2');
+            
+            fileInput.value = ''; // Clear file input
+            resultVideo.src = '';
+            URL.revokeObjectURL(resultVideo.src); // Clean up old object URL
+
+            // Show input, hide others
+            fileInputState.classList.remove('hidden');
+            processingState.classList.add('hidden');
+            resultState.classList.add('hidden');
+        });
+
+        /**
+         * Processes the list of selected files.
+         * It identifies the video and audio files and updates the UI.
+         */
+        function handleFiles(files) {
+            for (const file of files) {
+                if (file.type === 'video/mp4') {
+                    videoFile = file;
+                    videoStatus.textContent = file.name;
+                    videoStatus.classList.remove('italic', 'text-gray-500');
+                    // Add green border to show success
+                    videoStatusUI.classList.add('border-green-500', 'border-2');
+                } else if (file.type === 'audio/mpeg') {
+                    audioFile = file;
+                    audioStatus.textContent = file.name;
+                    audioStatus.classList.remove('italic', 'text-gray-500');
+                    audioStatusUI.classList.add('border-green-500', 'border-2');
+                }
+            }
+            // Once files are handled, check if we can start processing.
+            checkAndStartProcessing();
+        }
+
+        /**
+         * Checks if both video and audio files are present.
+         * If yes, it transitions the UI and starts the main process.
+         */
+        function checkAndStartProcessing() {
+            if (videoFile && audioFile) {
+                // Hide input, show processing
+                fileInputState.classList.add('hidden');
+                processingState.classList.remove('hidden');
+                
+                // Reset progress bar
+                progressBar.style.width = '0%';
+                progressText.textContent = '0%';
+                
+                startProcessing();
+            }
+        }
+
+        /**
+         * The core processing function.
+         * This is an async function to handle file loading and decoding.
+         */
+        async function startProcessing() {
+            try {
+                // --- 1. Load and Decode Audio (Web Audio API) ---
+                statusMessage.textContent = 'Decoding audio...';
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const audioArrayBuffer = await audioFile.arrayBuffer();
+                audioBuffer = await audioContext.decodeAudioData(audioArrayBuffer);
+                const audioDuration = audioBuffer.duration;
+
+                // --- 2. Load Video ---
+                statusMessage.textContent = 'Loading video...';
+                sourceVideo.src = URL.createObjectURL(videoFile);
+                await new Promise(resolve => {
+                    sourceVideo.onloadedmetadata = () => resolve();
+                });
+                
+                // Set canvas to match video dimensions
+                canvas.width = sourceVideo.videoWidth;
+                canvas.height = sourceVideo.videoHeight;
+
+                // --- 3. Prepare Media Streams ---
+                statusMessage.textContent = 'Preparing streams...';
+
+                // a) Audio Stream: From the decoded AudioBuffer
+                const audioSource = audioContext.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                const audioDestination = audioContext.createMediaStreamDestination();
+                audioSource.connect(audioDestination);
+                const audioStream = audioDestination.stream;
+
+                // b) Video Stream: From the canvas (which captures the looping video)
+                const canvasStream = canvas.captureStream(30); // 30 FPS
+
+                // --- 4. Combine Streams and Record (MediaRecorder API) ---
+                statusMessage.textContent = 'Combining and recording...';
+                const combinedStream = new MediaStream();
+                combinedStream.addTrack(canvasStream.getVideoTracks()[0]);
+                combinedStream.addTrack(audioStream.getAudioTracks()[0]);
+
+                const chunks = [];
+                // As per spec, output WebM. It's the most compatible for in-browser recording.
+                const mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+
+                // --- 5. Set up Event Listeners for Recording ---
+
+                // When data is available, add it to the chunks array
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        chunks.push(e.data);
+                    }
+                };
+
+                // When the recording stops, create the final video blob
+                mediaRecorder.onstop = () => {
+                    statusMessage.textContent = 'Complete!';
+                    const blob = new Blob(chunks, { type: 'video/webm' });
+                    const resultUrl = URL.createObjectURL(blob);
+                    resultVideo.src = resultUrl;
+
+                    // Show result, hide processing
+                    processingState.classList.add('hidden');
+                    resultState.classList.remove('hidden');
+                    
+                    // Clean up
+                    URL.revokeObjectURL(sourceVideo.src);
+                };
+                
+                // When the audio source *actually* finishes playing, stop everything
+                audioSource.onended = () => {
+                    statusMessage.textContent = 'Finalizing...';
+                    mediaRecorder.stop();
+                    cancelAnimationFrame(animationFrameId); // Stop the canvas draw loop
+                    clearInterval(progressInterval); // Stop the progress bar updater
+                    if (audioContext && audioContext.state !== 'closed') { // Check if context is already closed
+                        audioContext.close();
+                    }
+                    sourceVideo.pause();
+                    
+                    // Final progress bar update
+                    progressBar.style.width = '100%';
+                    progressText.textContent = '100%';
+                };
+
+                // --- 6. Start Everything! ---
+                mediaRecorder.start();
+                audioSource.start(); // This starts the "master clock"
+                sourceVideo.play(); // Start the (muted, looping) video
+                renderLoop(); // Start the canvas draw loop
+                
+                // Start the progress bar updater
+                progressInterval = setInterval(() => {
+                    const progress = (audioContext.currentTime / audioDuration) * 100;
+                    progressBar.style.width = `${progress}%`;
+                    progressText.textContent = `${Math.floor(progress)}%`;
+                }, 250);
+
+            } catch (error) {
+                console.error('Error during processing:', error);
+                statusMessage.textContent = `Error: ${error.message}`;
+                
+                // Wait a moment so user can see the error, then reset
+                // Replaced alert() with a UI-based error message and auto-reset
+                setTimeout(() => {
+                    // In case of error, show the reset button
+                    processingState.classList.add('hidden');
+                    fileInputState.classList.remove('hidden');
+                    resetButton.click(); // Trigger a full reset
+                }, 2000); // Show error for 2 seconds
+            }
+        }
+ 
+        function renderLoop() {
+            ctx.drawImage(sourceVideo, 0, 0, canvas.width, canvas.height);
+            // Continue the loop
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+    </script>
+</body>
+</html>
+
