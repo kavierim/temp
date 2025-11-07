@@ -9,6 +9,7 @@ This repository contains various small code trials and experiments. It serves as
 - [Maastokartta](https://kavierim.github.io/temp/maastokartta.html): A topographic map visualization project
 - [Video-Audio Loop-Merger](https://kavierim.github.io/temp/VideoLooper.html): Loop a video for the full duration of an audio track. Runs 100% in your browser.
 - [Last Frame Extractor](https://kavierim.github.io/temp/LastFrameExtractor.html): Extract the last frame of a video as an image. Runs 100% in your browser.
+- [Chatbot](https://kavierim.github.io/temp/Chatbot.html): A browser-based chatbot using Transformers.js.
 
 ## How to Use
 
@@ -25,6 +26,7 @@ For example:
 - https://kavierim.github.io/temp/maastokartta.html
 - https://kavierim.github.io/temp/VideoLooper.html
 - https://kavierim.github.io/temp/LastFrameExtractor.html
+- https://kavierim.github.io/temp/Chatbot.html
 
 ## Contributing
 
