@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Last Frame Extractor</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom style for the drag-over effect */
+        .drag-over {
+            border-style: solid;
+            border-color: #2563eb; /* blue-600 */
+            background-color: #dbeafe; /* blue-100 */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <div class="bg-white p-8 rounded-lg shadow-xl max-w-lg w-full text-center">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4">Last Frame Extractor</h1>
+        <p class="text-gray-600 mb-6">Drag and drop a video file below to get the final frame as an image.</p>
+
+        <!-- The drop zone -->
+        <div id="drop-zone" class="border-4 border-dashed border-gray-300 rounded-lg p-16 transition-all duration-300 ease-in-out cursor-pointer hover:border-gray-400">
+            <p id="drop-message" class="text-gray-500">Drop your video file here</p>
+        </div>
+
+        <!-- Download button (hidden by default) -->
+        <a id="download-btn"
+           class="hidden mt-6 inline-block bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 ease-in-out hover:bg-blue-700 hover:shadow-xl transform hover:-translate-y-0.5"
+           href="#"
+           download="last_frame.png">
+            Download Last Frame
+        </a>
+
+        <!-- Status message area -->
+        <p id="status-message" class="text-red-500 mt-4 h-6"></p>
+
+        <!-- Hidden elements for processing -->
+        <video id="video-player" class="hidden" preload="metadata" controls></video>
+        <canvas id="canvas" class="hidden"></canvas>
+    </div>
+
+    <script>
+        // Get references to all the necessary DOM elements
+        const dropZone = document.getElementById('drop-zone');
+        const dropMessage = document.getElementById('drop-message');
+        const videoPlayer = document.getElementById('video-player');
+        const canvas = document.getElementById('canvas');
+        const downloadBtn = document.getElementById('download-btn');
+        const statusMessage = document.getElementById('status-message');
+
+        // --- Drag and Drop Event Handlers ---
+
+        // Prevent default browser behavior for drag-and-drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Add visual indicator when dragging over the drop zone
+        dropZone.addEventListener('dragover', () => {
+            dropZone.classList.add('drag-over');
+        });
+
+        // Remove visual indicator when leaving the drop zone
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        // Handle the file drop
+        dropZone.addEventListener('drop', (e) => {
+            dropZone.classList.remove('drag-over');
+            statusMessage.textContent = ''; // Clear previous errors
+            downloadBtn.classList.add('hidden'); // Hide button
+
+            const files = e.dataTransfer.files;
+
+            if (files.length === 0) {
+                statusMessage.textContent = 'No file was dropped.';
+                return;
+            }
+
+            const file = files[0];
+
+            if (!file.type.startsWith('video/')) {
+                statusMessage.textContent = 'Invalid file type. Please drop a video file.';
+                return;
+            }
+
+            // Create a URL for the video file and set it as the player's source
+            const videoUrl = URL.createObjectURL(file);
+            videoPlayer.src = videoUrl;
+            dropMessage.textContent = `Processing "${file.name}"...`;
+        });
+
+        // --- Video Event Handlers ---
+
+        // Fired when the video's metadata (like duration) is loaded
+        videoPlayer.addEventListener('loadedmetadata', () => {
+            // Seek to the very end of the video.
+            // We set it to the duration, and the 'seeked' event will fire
+            // once the browser has successfully landed on that frame.
+            videoPlayer.currentTime = videoPlayer.duration;
+        });
+
+        // Fired after the video has successfully sought to the new time
+        videoPlayer.addEventListener('seeked', () => {
+            // Now that we are at the last frame, draw it to the canvas
+            const context = canvas.getContext('2d');
+
+            // Set canvas dimensions to match the video
+            canvas.width = videoPlayer.videoWidth;
+            canvas.height = videoPlayer.videoHeight;
+
+            // Draw the current video frame onto the canvas
+            context.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+
+            // Create a data URL for the image on the canvas (as a PNG)
+            const dataUrl = canvas.toDataURL('image/png');
+
+            // Set the download button's link and make it visible
+            downloadBtn.href = dataUrl;
+            downloadBtn.classList.remove('hidden');
+
+            // Update status messages
+            dropMessage.textContent = 'Drop another video file here';
+            statusMessage.textContent = 'Processing complete!';
+            statusMessage.classList.remove('text-red-500');
+            statusMessage.classList.add('text-green-600');
+
+
+            // Clean up the object URL to free memory
+            URL.revokeObjectURL(videoPlayer.src);
+        });
+
+        // Handle any errors during video loading
+        videoPlayer.addEventListener('error', () => {
+            statusMessage.textContent = 'Error loading the video file. It may be corrupt or in an unsupported format.';
+            statusMessage.classList.add('text-red-500');
+            statusMessage.classList.remove('text-green-600');
+            dropMessage.textContent = 'Drop your video file here';
+            downloadBtn.classList.add('hidden');
+        });
+
+    </script>
+</body>
+</html>
