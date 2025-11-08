@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text to Speech</title>
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Simple loading spinner for the button */
+        .btn-loading::after {
+            content: '';
+            display: inline-block;
+            width: 1.25rem;
+            height: 1.25rem;
+            margin-left: 0.5rem;
+            border: 2px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-2xl p-6 md:p-8">
+        <h1 class="text-3xl font-bold mb-3 text-center text-gray-800">
+            Text-to-Speech
+        </h1>
+        <p class="text-center text-gray-600 mb-6">
+            Uses Xenova/speecht5_tts (quantized) to generate speech
+            directly in your browser with Transformers.js.
+        </p>
+
+        <!-- Text Input Area -->
+        <label for="text-input" class="block text-sm font-medium text-gray-700 mb-2">Enter text to synthesize:</label>
+        <textarea id="text-input"
+            class="w-full h-32 p-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
+            placeholder="Hello, this is a test of client-side text-to-speech... (Max 200 chars for demo)"
+            maxlength="200"
+        >Hello, this is a test of client-side text-to-speech running entirely in the browser.</textarea>
+        <p id="char-count" class="text-right text-sm text-gray-500 mt-1">82 / 200</p>
+
+        <!-- Synthesize Button -->
+        <button id="synthesize-btn"
+            class="w-full mt-4 py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75 transition-all duration-200 flex items-center justify-center disabled:bg-indigo-300 disabled:cursor-not-allowed"
+            disabled
+        >
+            <span id="btn-text">Initializing Model...</span>
+        </button>
+
+        <!-- Audio Controls (Hidden by default) -->
+        <div id="audio-controls" class="hidden mt-4">
+            <audio id="audio-player" controls class="w-full rounded-lg"></audio>
+            <div class="flex space-x-4 mt-4">
+                <a id="download-link"
+                   class="flex-1 text-center py-3 px-4 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition-all duration-200 cursor-pointer">
+                   Download .wav
+                </a>
+                <button id="synthesize-again-btn"
+                   class="flex-1 py-3 px-4 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-75 transition-all duration-200">
+                   Synthesize New Text
+                </button>
+            </div>
+        </div>
+
+        <!-- Status Message -->
+        <div id="status" class="w-full mt-4 text-center text-gray-600 font-medium min-h-[1.5em]">
+            Please wait...
+        </div>
+    </div>
+
+    <!-- 2. Import Transformers.js (ESM) -->
+    <script type="module">
+        // Import the pipeline (and Tensor for custom voices later)
+        import { pipeline, Tensor } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.6';
+
+        // --- UI Elements ---
+        const textInput = document.getElementById('text-input');
+        const synthesizeBtn = document.getElementById('synthesize-btn');
+        const statusDiv = document.getElementById('status');
+        const btnText = document.getElementById('btn-text');
+        const charCount = document.getElementById('char-count');
+        const audioControls = document.getElementById('audio-controls');
+        const audioPlayer = document.getElementById('audio-player');
+        const downloadLink = document.getElementById('download-link');
+        const synthesizeAgainBtn = document.getElementById('synthesize-again-btn');
+
+        // --- State Variables ---
+        let synthesizer = null;
+        let speaker_embeddings = null;
+        let currentWavBlobUrl = null; // To store the blob URL for cleanup
+
+        // --- Character Counter ---
+        textInput.addEventListener('input', () => {
+            const len = textInput.value.length;
+            charCount.textContent = `${len} / 200`;
+        });
+
+        // --- STEP 1: Initialize the Model ---
+        async function initializeModel() {
+            statusDiv.textContent = 'Loading models... (This may take a minute and ~615MB on first load).';
+            
+            try {
+                // 1.1. Create the text-to-speech pipeline
+                // We use { dtype: 'q8' } to load the int8 quantized model (mandatory).
+                //
+                // !!! TEST: Remove { dtype: 'q8' } to load the HUGE ~615MB fp32 model.
+                // !!! This will have better quality but is not suitable for a real website.
+                synthesizer = await pipeline(
+                    'text-to-speech', 
+                    'Xenova/speecht5_tts'
+                    // { dtype: 'q8' } // <-- Temporarily removed for testing
+                );
+
+                // 1.2. Load the default speaker embedding
+                // This is a default voice provided by the model creators.
+                speaker_embeddings = 'https://huggingface.co/datasets/Xenova/transformers.js-docs/resolve/main/speaker_embeddings.bin';
+                
+                statusDiv.textContent = 'Model loaded. Ready to synthesize.';
+                btnText.textContent = 'Synthesize Speech';
+                synthesizeBtn.disabled = false;
+            } catch (e) {
+                console.error(e);
+                statusDiv.textContent = `Error: ${e.message}. Please refresh.`;
+                btnText.textContent = 'Error Loading Model';
+            }
+        }
+
+        // --- STEP 2: Run Synthesis ---
+        async function synthesizeSpeech() {
+            if (!synthesizer || !speaker_embeddings) return;
+
+            const text = textInput.value.trim();
+            if (!text) {
+                statusDiv.textContent = 'Please enter some text to synthesize.';
+                return;
+            }
+
+            statusDiv.textContent = 'Synthesizing...';
+            synthesizeBtn.disabled = true;
+            btnText.textContent = 'Working...';
+            synthesizeBtn.classList.add('btn-loading');
+
+            try {
+                // 3. Generate speech
+                // The result object contains the audio waveform and sample rate
+                const result = await synthesizer(text, { speaker_embeddings });
+
+                // 4. Convert raw audio to WAV Blob
+                const wavBlob = pcmToWav(result.audio, result.sampling_rate);
+
+                // 5. Clean up old blob URL if it exists
+                if (currentWavBlobUrl) {
+                    URL.revokeObjectURL(currentWavBlobUrl);
+                }
+
+                // 6. Create new URL for the blob
+                currentWavBlobUrl = URL.createObjectURL(wavBlob);
+
+                // 7. Set up audio player and download link
+                audioPlayer.src = currentWavBlobUrl;
+                downloadLink.href = currentWavBlobUrl;
+                downloadLink.download = 'synthesis.wav'; // Set filename for download
+                
+                statusDiv.textContent = 'Synthesis complete.';
+                
+                // 8. Update UI visibility
+                synthesizeBtn.classList.add('hidden'); // Hide synthesize button
+                audioControls.classList.remove('hidden'); // Show audio controls
+
+            } catch (e) {
+                console.error(e);
+                statusDiv.textContent = `Error: ${e.message}`;
+                // On error, re-enable the synthesize button
+                synthesizeBtn.disabled = false;
+            } finally {
+                // This runs regardless of success or error
+                // Reset button loading state
+                btnText.textContent = 'Synthesize Speech';
+                synthesizeBtn.classList.remove('btn-loading');
+            }
+        }
+
+        /**
+         * Converts raw PCM audio data (Float32Array) to a WAV file Blob.
+         * @param {Float32Array} pcmData The raw audio waveform.
+         * @param {number} sampleRate The sample rate of the audio (e.g., 16000).
+         * @returns {Blob} A Blob object representing the WAV file.
+         */
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const dataSize = pcmData.length * numChannels * (bitsPerSample / 8);
+            const buffer = new ArrayBuffer(44 + dataSize);
+            const view = new DataView(buffer);
+
+            function writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+
+            let offset = 0;
+
+            // RIFF header
+            writeString(view, offset, 'RIFF'); offset += 4;
+            view.setUint32(offset, 36 + dataSize, true); offset += 4;
+            writeString(view, offset, 'WAVE'); offset += 4;
+
+            // fmt sub-chunk
+            writeString(view, offset, 'fmt '); offset += 4;
+            view.setUint32(offset, 16, true); offset += 4; // Sub-chunk size (16 for PCM)
+            view.setUint16(offset, 1, true); offset += 2; // Audio format (1 for PCM)
+            view.setUint16(offset, numChannels, true); offset += 2;
+            view.setUint32(offset, sampleRate, true); offset += 4;
+            view.setUint32(offset, sampleRate * numChannels * (bitsPerSample / 8), true); offset += 4; // Byte rate
+            view.setUint16(offset, numChannels * (bitsPerSample / 8), true); offset += 2; // Block align
+            view.setUint16(offset, bitsPerSample, true); offset += 2;
+
+            // data sub-chunk
+            writeString(view, offset, 'data'); offset += 4;
+            view.setUint32(offset, dataSize, true); offset += 4;
+
+            // Write PCM data
+            for (let i = 0; i < pcmData.length; i++, offset += 2) {
+                let s = Math.max(-1, Math.min(1, pcmData[i]));
+                s = s < 0 ? s * 0x8000 : s * 0x7FFF; // Convert to 16-bit signed int
+                view.setInt16(offset, s, true);
+            }
+
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        // --- STEP 3: Play Raw Audio (The "Missing Link") ---
+        /**
+         * Plays raw audio data (Float32Array) using the Web Audio API.
+         * @param {Float32Array} audioData The raw audio waveform.
+         * @param {number} samplingRate The sample rate of the audio (e.g., 16000).
+         */
+        function playAudio(audioData, samplingRate) {
+            try {
+                // 1. Get a new AudioContext
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+                // 2. Create an empty AudioBuffer
+                // Parameters: (numChannels, length, sampleRate)
+                const audioBuffer = audioCtx.createBuffer(1, audioData.length, samplingRate);
+
+                // 3. Copy the raw Float32Array data into the AudioBuffer
+                audioBuffer.copyToChannel(audioData, 0); // 0 = first channel
+
+                // 4. Create a playable source node
+                const source = audioCtx.createBufferSource();
+
+                // 5. Assign the buffer to the source
+                source.buffer = audioBuffer;
+
+                // 6. Connect the source to the user's speakers
+                source.connect(audioCtx.destination);
+
+                // 7. Play the sound
+                source.start();
+                
+                // 8. Handle audio context shutdown (good practice)
+                source.onended = () => {
+                    audioCtx.close().catch(e => console.error("Error closing AudioContext:", e));
+                };
+
+            } catch (e) {
+                console.error("Error playing audio:", e);
+                statusDiv.textContent = "Error playing audio. See console for details.";
+            }
+        }
+
+        // --- Add event listener and initialize ---
+        synthesizeBtn.addEventListener('click', synthesizeSpeech);
+
+        synthesizeAgainBtn.addEventListener('click', () => {
+            // Hide audio controls
+            audioControls.classList.add('hidden');
+            
+            // Show and re-enable synthesize button
+            synthesizeBtn.classList.remove('hidden');
+            synthesizeBtn.disabled = false;
+
+            // Clear audio player
+            audioPlayer.src = '';
+
+            // Clean up blob URL
+            if (currentWavBlobUrl) {
+                URL.revokeObjectURL(currentWavBlobUrl);
+                currentWavBlobUrl = null;
+            }
+
+            // Reset status
+            statusDiv.textContent = 'Ready to synthesize.';
+        });
+
+        initializeModel();
+    </script>
+</body>
+</html>
