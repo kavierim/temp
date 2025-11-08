@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to HTML Generator (Local)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #4f46e5;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #4f46e5;
+        }
+        .overlay {
+            border: 2px solid var(--overlay-color);
+            transition: background-color 0.2s;
+        }
+        .overlay:hover {
+            background-color: rgba(var(--overlay-color-rgb), 0.7);
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-900 antialiased">
+
+    <main class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Image to HTML Generator</h1>
+            <p class="text-lg text-gray-600 mt-2">Convert any image into an HTML page (local model).</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+            <!-- Left Panel: Image Input -->
+            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col">
+                <h2 class="text-2xl font-semibold mb-4">1. Drop your Image</h2>
+                
+                <input type="file" id="file-input" class="hidden" accept="image/png, image/jpeg, image/webp">
+
+                <div class="relative flex-grow">
+
+                    <!-- Drop Zone -->
+                    <div id="drop-zone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 hover:border-blue-500 hover:bg-blue-50 h-full w-full flex flex-col justify-center">
+                        
+                        <div id="image-preview-container" class="hidden relative">
+                            <img id="image-preview" src="" alt="Selected image" class="max-h-64 mx-auto rounded-md shadow-sm">
+                            <button id="remove-image-btn" class="absolute top-2 right-2 z-10 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div id="image-placeholder" class="flex flex-col items-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-600">
+                                <span class="font-semibold text-blue-600">Drag and drop</span>
+                                or click to select a file
+                            </p>
+                            <p class="text-xs text-gray-500">PNG, JPG, WEBP</p>
+                        </div>
+                    </div>
+            
+                    <!-- Model loading overlay -->
+                    <div id="model-loader" class="hidden absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center space-y-3 text-gray-700 rounded-lg">
+                        <div class="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-500 mb-3"></div>
+                        <h3 class="text-lg font-semibold text-center text-gray-700">Loading model...</h3>
+                        <p class="text-center text-gray-500 text-sm mt-1">The model is being downloaded to your browser...</p>
+                        
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-3">
+                            <div id="model-progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                        
+                        <p id="progress-text" class="text-center text-gray-500 text-sm mt-1">0%</p>
+                    </div>
+
+                </div>
+                
+                <!-- NEW: User Prompt Input -->
+                <label for="prompt-input" class="block text-sm font-medium text-gray-700 mt-4">Prompt:</label>
+                <input type="text" id="prompt-input" class="w-full mt-1 p-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" value="Convert this page to docling.">
+            
+            </div>
+
+            <!-- Right Panel: Result -->
+            <div class="bg-white p-6 rounded-lg shadow-md flex flex-col h-[70vh]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold">2. Result</h2>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium">Source</span>
+                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input
+                                type="checkbox"
+                                name="toggle"
+                                id="view-toggle"
+                                class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                                checked
+                            />
+                            <label
+                                for="view-toggle"
+                                class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
+                            ></label>
+                        </div>
+                        <span class="text-sm font-medium text-indigo-600">Preview</span>
+                    </div>
+                </div>
+                
+                <!-- Result Container -->
+                <div id="output-container" class="flex-1 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 relative">
+                    
+                    <div id="welcome-message" class="h-full flex items-center justify-center text-center text-gray-500 p-4">
+                        <p>Drop an image on the left to see the generated HTML result here.</p>
+                    </div>
+                    
+                    <div id="docling-view" class="h-full p-4 hidden">
+                        <pre class="h-full whitespace-pre-wrap text-sm overflow-auto"><code id="docling-output"></code></pre>
+                    </div>
+
+                    <div id="html-view" class="h-full w-full">
+                        <iframe id="html-iframe" sandbox="allow-scripts allow-same-origin" class="w-full h-full border-0 hidden"></iframe>
+                    </div>
+
+                    <!-- Processing overlay -->
+                    <div id="processing-indicator" class="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center space-y-3 text-gray-700 hidden">
+                        <div class="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-500"></div>
+                        <p class="text-lg font-semibold">Processing...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- NEW: Footer Section -->
+    <footer class="text-center py-8 text-gray-600 text-sm">
+        <div class="container mx-auto px-4 md:px-8">
+            <p class="mb-1">
+                This page uses Granite Docling 258M model (ONNX) model and runs entirely in your browser.
+        </div>
+    </footer>
+    
+    <canvas id="hidden-canvas" class="hidden"></canvas>
+
+    <script type="module">
+        import { AutoProcessor, AutoModelForVision2Seq, RawImage, TextStreamer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.5";
+        import { doclingToHtml } from "https://ibm-granite-granite-docling-258m-webgpu.static.hf.space/parser.js";
+
+        // --- DOM Elements ---
+        const dom = {
+            dropZone: document.getElementById('drop-zone'),
+            fileInput: document.getElementById('file-input'),
+            imagePreviewContainer: document.getElementById('image-preview-container'),
+            imagePreview: document.getElementById('image-preview'),
+            removeImageBtn: document.getElementById('remove-image-btn'),
+            imagePlaceholder: document.getElementById('image-placeholder'),
+            modelLoader: document.getElementById("model-loader"),
+            modelProgressBar: document.getElementById("model-progress-bar"),
+            progressText: document.getElementById("progress-text"),
+            promptInput: document.getElementById("prompt-input"),
+            processingIndicator: document.getElementById("processing-indicator"),
+            welcomeMessage: document.getElementById("welcome-message"),
+            doclingView: document.getElementById("docling-view"),
+            doclingOutput: document.getElementById("docling-output"),
+            viewToggle: document.getElementById("view-toggle"),
+            htmlView: document.getElementById("html-view"),
+            htmlIframe: document.getElementById("html-iframe"),
+            hiddenCanvas: document.getElementById("hidden-canvas")
+        };
+
+        // --- Application State ---
+        let model, processor;
+        let currentImageWidth, currentImageHeight;
+        let currentImage = null;
+
+        // --- Event Listeners ---
+        function setupEventListeners() {
+            // Drag and Drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dom.dropZone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dom.dropZone.addEventListener(eventName, () => dom.dropZone.classList.add('border-blue-500', 'bg-blue-50'), false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dom.dropZone.addEventListener(eventName, () => dom.dropZone.classList.remove('border-blue-500', 'bg-blue-50'), false);
+            });
+            dom.dropZone.addEventListener('drop', handleDrop, false);
+            
+            // File Click
+            dom.dropZone.addEventListener('click', () => dom.fileInput.click());
+            dom.fileInput.addEventListener('change', handleFileSelect);
+
+            // UI Buttons
+            dom.removeImageBtn.addEventListener('click', removeImage);
+            dom.viewToggle.addEventListener("change", toggleView);
+            
+            // Page Load
+            document.addEventListener("DOMContentLoaded", initializeApp);
+        }
+
+        // --- Event Handlers ---
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function toggleView() {
+            const isHtmlView = dom.viewToggle.checked;
+            dom.htmlView.classList.toggle("hidden", !isHtmlView);
+            dom.htmlIframe.classList.toggle("hidden", !isHtmlView);
+            dom.doclingView.classList.toggle("hidden", isHtmlView);
+        }
+
+        function initializeApp() {
+            setUiState("initial");
+            dom.modelLoader.style.display = "flex";
+            initializeModel().catch((err) => {
+                console.error("Failed to initialize model:", err);
+                dom.modelLoader.innerHTML = `
+                    <h2 class="text-center text-red-500 text-xl font-semibold">Failed to Load Model</h2>
+                    <p class="text-center text-gray-700 text-md mt-2">Please refresh the page to try again. Check the console for errors.</p>
+                `;
+                dom.modelLoader.style.display = "flex";
+            });
+        }
+        
+        // --- Core Functions ---
+
+        /**
+         * Loads the selected file into an Image object and starts processing.
+         * @param {File} source - The user-selected image file.
+         */
+        function handleFile(source) {
+            const reader = new FileReader();
+            const img = new Image();
+            
+            img.onload = () => {
+                currentImageWidth = img.naturalWidth;
+                currentImageHeight = img.naturalHeight;
+                currentImage = img;
+                
+                dom.imagePreview.src = img.src;
+                dom.imagePlaceholder.classList.add("hidden");
+                dom.imagePreviewContainer.classList.remove("hidden");
+                
+                processImage(img).catch((err) => {
+                    console.error("Error in processImage promise:", err);
+                    dom.doclingOutput.textContent = `An error occurred: ${err.message}`;
+                    setUiState("result");
+                });
+            };
+            img.onerror = () => {
+                console.error("Failed to load image.");
+            };
+            
+            reader.onload = (e) => (img.src = e.target.result);
+            reader.readAsDataURL(source);
+        }
+
+        /**
+         * Resets the UI to the initial state.
+         */
+        function removeImage(e) {
+            if (e) e.stopPropagation();
+            currentImage = null;
+            dom.imagePreview.src = "";
+            dom.fileInput.value = "";
+            dom.imagePlaceholder.classList.remove("hidden");
+            dom.imagePreviewContainer.classList.add("hidden");
+            setUiState("initial");
+            dom.doclingOutput.textContent = "";
+            dom.htmlIframe.srcdoc = "";
+            clearOverlays(); 
+        }
+
+        /**
+         * Initializes the Transformers.js model and processor.
+         */
+        async function initializeModel() {
+            try {
+                const model_id = "onnx-community/granite-docling-258M-ONNX";
+                processor = await AutoProcessor.from_pretrained(model_id);
+                const progress = {};
+                model = await AutoModelForVision2Seq.from_pretrained(model_id, {
+                    dtype: {
+                        embed_tokens: "fp16", 
+                        vision_encoder: "fp32", 
+                        decoder_model_merged: "fp32",
+                    },
+                    device: "webgpu",
+                    progress_callback: (data) => {
+                        if (data.status === "progress" && data.file?.endsWith?.("onnx_data")) {
+                            progress[data.file] = data;
+                            if (Object.keys(progress).length !== 3) return;
+                            
+                            let sum = 0;
+                            let total = 0;
+                            for (const val of Object.values(progress)) {
+                                sum += val.loaded;
+                                total += val.total;
+                            }
+                            
+                            const overallPercent = Math.round((sum / total) * 100);
+                            dom.modelProgressBar.style.width = overallPercent + "%";
+                            dom.progressText.textContent = overallPercent + "%";
+                        }
+                    },
+                });
+                dom.modelLoader.style.display = "none";
+                console.log("Model loaded successfully.");
+            } catch (error) {
+                console.error("Failed to load model:", error);
+                dom.modelLoader.innerHTML = `
+                    <h2 class="text-center text-red-500 text-xl font-semibold">Failed to Load Model</h2>
+                    <p class="text-center text-gray-700 text-md mt-2">Please refresh the page to try again. Check the console for errors.</p>
+                `;
+                dom.modelLoader.style.display = "flex";
+                throw error;
+            }
+        }
+
+        /**
+         * Processes the image, generates docling text, and renders HTML.
+         * @param {HTMLImageElement} imageObject - An image object to process.
+         */
+        async function processImage(imageObject) {
+            if (!model || !processor) {
+                console.error("Model is not loaded yet. Please wait.");
+                return;
+            }
+            
+            setUiState("processing");
+            clearOverlays(); 
+            let fullText = "";
+            dom.doclingOutput.textContent = "";
+            dom.htmlIframe.srcdoc = "";
+
+            try {
+                const ctx = dom.hiddenCanvas.getContext("2d");
+                dom.hiddenCanvas.width = imageObject.width;
+                dom.hiddenCanvas.height = imageObject.height;
+                ctx.drawImage(imageObject, 0, 0);
+                const image = RawImage.fromCanvas(dom.hiddenCanvas);
+                
+                const userPrompt = dom.promptInput.value || "Convert this page to docling.";
+                const messages = [
+                    {
+                        role: "user",
+                        content: [{ type: "image" }, { type: "text", text: userPrompt }], 
+                    },
+                ];
+                
+                const text = processor.apply_chat_template(messages, { add_generation_prompt: true });
+                const inputs = await processor(text, [image], { do_image_splitting: true });
+                
+                await model.generate({
+                    ...inputs,
+                    max_new_tokens: 4096,
+                    streamer: new TextStreamer(processor.tokenizer, {
+                        skip_prompt: true,
+                        skip_special_tokens: false,
+                        callback_function: (streamedText) => {
+                            fullText += streamedText;
+                            dom.doclingOutput.textContent += streamedText;
+                        },
+                    }),
+                });
+                
+                fullText = fullText.replace(/<\|end_of_text\|>$/, "");
+                dom.doclingOutput.textContent = fullText;
+                
+                createOverlays(fullText);
+                dom.htmlIframe.srcdoc = doclingToHtml(fullText);
+
+            } catch (error) {
+                console.error("Error during image processing:", error);
+                dom.doclingOutput.textContent = `An error occurred: ${error.message}`;
+                dom.htmlIframe.srcdoc = `<html><body><p>Error: ${error.message}</p></body></html>`;
+            } finally {
+                setUiState("result");
+            }
+        }
+
+        /**
+         * Creates bounding box overlays on the preview image.
+         * @param {string} fullText - The generated docling text.
+         */
+        function createOverlays(fullText) {
+            const tagRegex = /<(\w+)><loc_(\d+)><loc_(\d+)><loc_(\d+)><loc_(\d+)>/g;
+            const overlays = [];
+            let match;
+            while ((match = tagRegex.exec(fullText)) !== null) {
+                const [_, tagType, y1, x1, y2, x2] = match.map((val, i) => i > 1 ? parseInt(val) : val);
+                overlays.push({ tagType, locs: [x1, y1, x2, y2] }); // Note: x, y order
+            }
+            
+            const colorMap = {};
+            const getRandomColor = () => `rgb(${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)}, ${Math.floor(Math.random() * 256)})`;
+
+            const imgRect = dom.imagePreview.getBoundingClientRect();
+            const containerRect = dom.imagePreviewContainer.getBoundingClientRect();
+            const imageOffsetLeft = imgRect.left - containerRect.left;
+            const imageOffsetTop = imgRect.top - containerRect.top;
+            const scaleX = imgRect.width / currentImageWidth;
+            const scaleY = imgRect.height / currentImageHeight;
+
+            overlays.forEach(({ tagType, locs }) => {
+                const color = colorMap[tagType] || (colorMap[tagType] = getRandomColor());
+                const [leftLoc, topLoc, rightLoc, bottomLoc] = locs.map(loc => loc / 500); // Normalize 0-500 scale
+                
+                const left = imageOffsetLeft + (leftLoc * currentImageWidth * scaleX);
+                const top = imageOffsetTop + (topLoc * currentImageHeight * scaleY);
+                const width = ((rightLoc - leftLoc) * currentImageWidth * scaleX);
+                const height = ((bottomLoc - topLoc) * currentImageHeight * scaleY);
+                
+                const overlay = document.createElement("div");
+                overlay.className = "overlay";
+                overlay.style.setProperty('--overlay-color', color);
+                const rgbMatch = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+                overlay.style.setProperty('--overlay-color-rgb', `${rgbMatch[1]},${rgbMatch[2]},${rgbMatch[3]}`);
+                overlay.style.position = "absolute";
+                overlay.style.left = left + "px";
+                overlay.style.top = top + "px";
+                overlay.style.width = width + "px";
+                overlay.style.height = height + "px";
+                dom.imagePreviewContainer.appendChild(overlay);
+            });
+        }
+
+        /**
+         * Manages the visibility of UI components based on state.
+         * @param {'initial'|'processing'|'result'} state
+         */
+        function setUiState(state) {
+            dom.welcomeMessage.style.display = "none";
+            dom.processingIndicator.classList.add("hidden");
+            dom.doclingView.classList.add("hidden");
+            dom.htmlView.classList.add("hidden");
+            dom.htmlIframe.classList.add("hidden");
+
+            if (state === "initial") {
+                dom.welcomeMessage.style.display = "flex";
+            } else if (state === "processing") {
+                dom.viewToggle.checked = false; // Switch to source view
+                dom.processingIndicator.classList.remove("hidden");
+                dom.doclingView.classList.remove("hidden");
+            } else if (state === "result") {
+                dom.viewToggle.checked = true; // Switch to preview view
+                dom.htmlView.classList.remove("hidden");
+                dom.htmlIframe.classList.remove("hidden");
+            }
+        }
+
+        /**
+         * Clears all bounding box overlays.
+         */
+        function clearOverlays() {
+            document.querySelectorAll(".overlay").forEach((el) => el.remove());
+        }
+
+        // --- Start Application ---
+        setupEventListeners();
+
+    </script>
+</body>
+</html>

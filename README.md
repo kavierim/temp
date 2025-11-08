@@ -10,6 +10,7 @@ This repository contains various small code trials and experiments. It serves as
 - [Video-Audio Loop-Merger](https://kavierim.github.io/temp/VideoLooper.html): Loop a video for the full duration of an audio track. Runs 100% in your browser.
 - [Last Frame Extractor](https://kavierim.github.io/temp/LastFrameExtractor.html): Extract the last frame of a video as an image. Runs 100% in your browser.
 - [Chatbot](https://kavierim.github.io/temp/Chatbot.html): A browser-based chatbot using Transformers.js.
+- [Image to HTML Generator](https://kavierim.github.io/temp/Image2HTML.html): Convert an image into an HTML page using a local model. Runs 100% in your browser.
 
 ## How to Use
 
@@ -27,6 +28,7 @@ For example:
 - https://kavierim.github.io/temp/VideoLooper.html
 - https://kavierim.github.io/temp/LastFrameExtractor.html
 - https://kavierim.github.io/temp/Chatbot.html
+- https://kavierim.github.io/temp/Image2HTML.html
 
 ## Contributing
 
