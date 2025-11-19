@@ -5,42 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Maastokartta PDF-generaattori</title>
-    <!-- Changed scripts to use defer for improved loading -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-
-        .container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100%;
-        }
-
-        .controls {
-            padding: 10px;
-            background-color: #f0f0f0;
-            border-bottom: 1px solid #ccc;
-        }
-
-        .map-container {
-            flex: 1;
-            position: relative;
-        }
-
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-
         .pdf-box {
             position: absolute;
             border: 4px dashed red;
@@ -48,97 +19,72 @@
             z-index: 1000;
         }
 
-        .button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-left: 10px;
-        }
-
-        .button:hover {
-            background-color: #45a049;
-        }
-
-        select,
-        input {
-            padding: 6px;
-            margin-right: 10px;
-        }
-
-        label {
-            margin-right: 5px;
-        }
-
-        .control-group {
-            display: inline-block;
-            margin-right: 20px;
-        }
-
-        .map-info {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 5px;
-            border-radius: 4px;
-            font-size: 12px;
-            z-index: 1000;
+        .leaflet-container {
+            font-family: inherit;
         }
     </style>
 </head>
 
-<body>
-    <div class="container">
-        <div class="controls">
-            <div class="control-group">
-                <label for="scale">Mittakaava:</label>
-                <select id="scale">
-                    <option value="5000">1:5 000</option>
-                    <option value="10000" selected>1:10 000</option>
-                    <option value="15000">1:15 000</option>
-                    <option value="20000">1:20 000</option>
-                    <option value="25000">1:25 000</option>
-                    <option value="50000">1:50 000</option>
-                </select>
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden font-sans">
+    <div class="flex flex-col h-full w-full">
+        <div
+            class="bg-white shadow-md z-10 p-4 border-b border-gray-200 flex flex-wrap gap-4 items-center justify-between">
+            <div class="flex flex-wrap gap-4 items-center">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <label for="scale" class="text-sm font-medium text-gray-700">Mittakaava:</label>
+                    <select id="scale"
+                        class="block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-gray-50">
+                        <option value="5000">1:5 000</option>
+                        <option value="10000" selected>1:10 000</option>
+                        <option value="15000">1:15 000</option>
+                        <option value="20000">1:20 000</option>
+                        <option value="25000">1:25 000</option>
+                        <option value="50000">1:50 000</option>
+                    </select>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <label for="paperSize" class="text-sm font-medium text-gray-700">Paperikoko:</label>
+                    <select id="paperSize"
+                        class="block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-gray-50">
+                        <option value="A4" selected>A4</option>
+                        <option value="A3">A3</option>
+                    </select>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <label for="orientation" class="text-sm font-medium text-gray-700">Suunta:</label>
+                    <select id="orientation"
+                        class="block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-gray-50">
+                        <option value="portrait" selected>Pysty</option>
+                        <option value="landscape">Vaaka</option>
+                    </select>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <label for="pdfZoom" class="text-sm font-medium text-gray-700">Tarkkuus:</label>
+                    <select id="pdfZoom"
+                        class="block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border bg-gray-50">
+                        <option value="10">Matala</option>
+                        <option value="12">Keskitaso</option>
+                        <option value="13" selected>Tarkka</option>
+                        <option value="14">Erittäin tarkka</option>
+                        <option value="15">Maksimi</option>
+                    </select>
+                </div>
             </div>
-            <div class="control-group">
-                <label for="paperSize">Paperikoko:</label>
-                <select id="paperSize">
-                    <option value="A4" selected>A4</option>
-                    <option value="A3">A3</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="orientation">Suunta:</label>
-                <select id="orientation">
-                    <option value="portrait" selected>Pysty</option>
-                    <option value="landscape">Vaaka</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="pdfZoom">Tarkkuus:</label>
-                <select id="pdfZoom">
-                    <option value="10">Matala</option>
-                    <option value="12">Keskitaso</option>
-                    <option value="13" selected>Tarkka</option>
-                    <option value="14">Erittäin tarkka</option>
-                    <option value="15">Maksimi</option>
-                </select>
-            </div>
-            <button class="button" id="generatePdf">Luo PDF</button>
+            <button id="generatePdf"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                Luo PDF
+            </button>
         </div>
-        <div class="map-container">
-            <div id="map"></div>
+        <div class="flex-1 relative w-full h-full bg-gray-200">
+            <div id="map" class="w-full h-full z-0"></div>
             <div class="pdf-box" id="pdfBox"></div>
-            <div class="map-info" id="mapInfo">OpenStreetMap © OpenStreetMap contributors</div>
+            <div class="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs text-gray-600 z-[1000] shadow-sm pointer-events-none"
+                id="mapInfo">
+                OpenStreetMap © OpenStreetMap contributors
+            </div>
         </div>
     </div>
-
     <script>
-        // Wrap all JavaScript code inside DOMContentLoaded for optimized initialization.
         document.addEventListener('DOMContentLoaded', function () {
             // Display loading status to help debug
             document.body.insertAdjacentHTML('afterbegin', '<div id="loading" style="position:fixed;top:10px;left:10px;background:white;padding:5px;z-index:2000;">Lataa karttaa...</div>');
@@ -955,8 +901,6 @@
                     document.addEventListener('mousemove', () => { lastInteraction = Date.now(); });
                     document.addEventListener('click', () => { lastInteraction = Date.now(); });
                     document.addEventListener('keypress', () => { lastInteraction = Date.now(); });
-
-                    // Removed setInterval polling loop
 
                 } catch (e) {
                     console.error("Virhe kartan alustamisessa:", e);
