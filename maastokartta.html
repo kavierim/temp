@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,38 +11,43 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
         }
+
         .container {
             display: flex;
             flex-direction: column;
             height: 100vh;
             width: 100%;
         }
+
         .controls {
             padding: 10px;
             background-color: #f0f0f0;
             border-bottom: 1px solid #ccc;
         }
+
         .map-container {
             flex: 1;
             position: relative;
         }
+
         #map {
             width: 100%;
             height: 100%;
         }
+
         .pdf-box {
             position: absolute;
             border: 4px dashed red;
             pointer-events: none;
             z-index: 1000;
         }
+
         .button {
             background-color: #4CAF50;
             color: white;
@@ -51,20 +57,26 @@
             cursor: pointer;
             margin-left: 10px;
         }
+
         .button:hover {
             background-color: #45a049;
         }
-        select, input {
+
+        select,
+        input {
             padding: 6px;
             margin-right: 10px;
         }
+
         label {
             margin-right: 5px;
         }
+
         .control-group {
             display: inline-block;
             margin-right: 20px;
         }
+
         .map-info {
             position: fixed;
             bottom: 10px;
@@ -77,6 +89,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="controls">
@@ -116,7 +129,6 @@
                 </select>
             </div>
             <button class="button" id="generatePdf">Luo PDF</button>
-            <!-- Removed "Näytä koko Suomi" button -->
         </div>
         <div class="map-container">
             <div id="map"></div>
@@ -127,20 +139,20 @@
 
     <script>
         // Wrap all JavaScript code inside DOMContentLoaded for optimized initialization.
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // Display loading status to help debug
             document.body.insertAdjacentHTML('afterbegin', '<div id="loading" style="position:fixed;top:10px;left:10px;background:white;padding:5px;z-index:2000;">Lataa karttaa...</div>');
-            
+
             // Add error handling
-            window.onerror = function(message, source, lineno, colno, error) {
+            window.onerror = function (message, source, lineno, colno, error) {
                 console.error("Virhe:", message, "lähde:", source, "rivi:", lineno);
-                document.body.insertAdjacentHTML('afterbegin', 
+                document.body.insertAdjacentHTML('afterbegin',
                     `<div style="color:red;position:fixed;top:40px;left:10px;background:white;padding:5px;z-index:2000;">
                         Virhe: ${message} (rivi ${lineno})
                     </div>`);
                 return false;
             };
-            
+
             // Define constants and cache DOM elements for better performance.
             const MM_PER_INCH = 25.4;
             const DPI = 96;
@@ -167,63 +179,63 @@
             // Debounce utility to limit frequency of function calls.
             function debounce(func, wait) {
                 let timeout;
-                return function() {
+                return function () {
                     clearTimeout(timeout);
                     timeout = setTimeout(func, wait);
                 };
             }
 
             // Optimized updatePdfBox function with debounce.
-            const updatePdfBox = debounce(function() {
+            const updatePdfBox = debounce(function () {
                 try {
                     const scale = parseInt(elements.scaleSelect.value);
                     const paperSize = elements.paperSizeSelect.value;
                     const orientation = elements.orientationSelect.value;
-                    
+
                     // Define the margin in mm (same as used in PDF generation)
                     const margin = 10;
-                    
+
                     // Määritä paperin mitat
                     let paperWidthMm = PAPER_SIZES[paperSize].width;
                     let paperHeightMm = PAPER_SIZES[paperSize].height;
-                    
+
                     // Vaihda suunta tarvittaessa
                     if (orientation === 'landscape') {
                         [paperWidthMm, paperHeightMm] = [paperHeightMm, paperWidthMm];
                     }
-                    
+
                     // Subtract margins to get the actual map area
                     const mapWidthMm = paperWidthMm - (margin * 2);
                     const mapHeightMm = paperHeightMm - (margin * 2);
-                    
+
                     // Muunna pikselit millimetreistä mittakaavaan - use the map area (not full paper)
                     const widthInRealWorld = mapWidthMm * (scale / 1000); // metreissä
                     const heightInRealWorld = mapHeightMm * (scale / 1000); // metreissä
-                    
+
                     // For Leaflet, calculate pixels differently
                     const zoom = map.getZoom();
-                    
+
                     // Calculate resolution based on zoom level
                     // In EPSG:3067, at zoom level 0, one pixel is 8192 meters
                     // Each zoom level increases resolution by factor 2
                     const baseResolution = 8192;
                     const resolution = baseResolution / Math.pow(2, zoom);
-                    
+
                     console.log("Updating PDF box with resolution:", resolution, "scale:", scale, "zoom:", zoom);
-                    
+
                     // Laske laatikon koko pikseleissä
                     const widthInPixels = widthInRealWorld / resolution;
                     const heightInPixels = heightInRealWorld / resolution;
-                    
+
                     // Päivitä laatikon tyyli
                     elements.pdfBox.style.width = widthInPixels + 'px';
                     elements.pdfBox.style.height = heightInPixels + 'px';
-                    
+
                     // Sijoita laatikko keskelle karttaa
                     const mapSize = map.getSize();
                     elements.pdfBox.style.left = (mapSize.x / 2 - widthInPixels / 2) + 'px';
                     elements.pdfBox.style.top = (mapSize.y / 2 - heightInPixels / 2) + 'px';
-                    
+
                     // Update border to indicate this is the content area (with margins outside)
                     elements.pdfBox.title = "Exact map area that will appear in PDF (10mm margins around this box)";
                 } catch (e) {
@@ -231,33 +243,51 @@
                 }
             }, 100);
 
+            // Helper to run promises with concurrency limit
+            async function runWithConcurrency(tasks, limit) {
+                const results = [];
+                const executing = [];
+                for (const task of tasks) {
+                    const p = task().then(result => {
+                        executing.splice(executing.indexOf(p), 1);
+                        return result;
+                    });
+                    results.push(p);
+                    executing.push(p);
+                    if (executing.length >= limit) {
+                        await Promise.race(executing);
+                    }
+                }
+                return Promise.all(results);
+            }
+
             // Optimized function to force-load tiles.
             function forceLoadTiles(zoomLevel) {
                 return new Promise((resolve, reject) => {
                     try {
                         console.log("Starting direct tile preloading for zoom level:", zoomLevel);
-                        
+
                         // Create a debug element to show tile loading progress
                         const tileDebugElement = document.createElement('div');
                         tileDebugElement.style = "position:fixed;bottom:40px;left:10px;background:rgba(255,255,255,0.9);padding:5px;z-index:2000;font-size:12px;";
                         tileDebugElement.id = "tile-loading-debug";
                         document.body.appendChild(tileDebugElement);
-                        
+
                         // Get all the tile elements
                         const tileContainers = document.querySelectorAll('.leaflet-tile-container');
                         tileContainers.forEach(container => {
                             // Force opacity to 1 to ensure all tiles are visible
                             container.style.opacity = '1';
                         });
-                        
+
                         // Force the map to update
                         map.invalidateSize();
-                        
+
                         // Get the bounds of the pdf box in geographical coordinates
                         const boxRect = elements.pdfBox.getBoundingClientRect();
                         const mapElement = elements.map;
                         const mapRect = mapElement.getBoundingClientRect();
-                        
+
                         // Create a visual overlay to show the area being captured
                         const captureArea = document.createElement('div');
                         captureArea.style = `
@@ -271,21 +301,21 @@
                             height: ${boxRect.height}px;
                         `;
                         mapElement.appendChild(captureArea);
-                        
+
                         // Convert corners to geographical coordinates
                         const nw = map.containerPointToLatLng([
                             boxRect.left - mapRect.left,
                             boxRect.top - mapRect.top
                         ]);
-                        
+
                         const se = map.containerPointToLatLng([
                             boxRect.right - mapRect.left,
                             boxRect.bottom - mapRect.top
                         ]);
-                        
+
                         // Create bounds for the PDF area
                         const pdfBounds = L.latLngBounds(nw, se);
-                        
+
                         // Use an alternative approach - create a temporary layer that covers this area
                         const tempLayer = L.rectangle(pdfBounds, {
                             fill: false,
@@ -294,9 +324,9 @@
                             opacity: 0.3,
                             interactive: false
                         }).addTo(map);
-                        
+
                         const zoom = zoomLevel || map.getZoom();
-                        
+
                         // Create a visual grid to show tile loading progress
                         const tileGrid = document.createElement('div');
                         tileGrid.style = `
@@ -314,33 +344,33 @@
                             overflow: auto;
                         `;
                         document.body.appendChild(tileGrid);
-                        
+
                         // Find the tile coordinates needed for this viewport area
                         const mapBoundsNW = map.project(pdfBounds.getNorthWest(), zoom);
                         const mapBoundsSE = map.project(pdfBounds.getSouthEast(), zoom);
-                        
+
                         const tileSize = 256;
-                        
+
                         // Calculate tile coordinates
                         const nwTilePoint = mapBoundsNW.divideBy(tileSize).floor();
                         const seTilePoint = mapBoundsSE.divideBy(tileSize).floor();
-                        
+
                         const xMin = nwTilePoint.x;
                         const xMax = seTilePoint.x;
                         const yMin = nwTilePoint.y;
                         const yMax = seTilePoint.y;
-                        
+
                         console.log(`Tile coordinates: x=${xMin}-${xMax}, y=${yMin}-${yMax}, z=${zoom}`);
-                        
+
                         // Track loading state
                         const totalTiles = (xMax - xMin + 1) * (yMax - yMin + 1);
                         let loadedTiles = 0;
                         let errorTiles = 0;
-                        let tilePromises = [];
+                        let tileTasks = [];
                         let tileContainerRefs = [];
-                        
+
                         tileDebugElement.innerHTML = `Ladataan karttatiiliä: 0/${totalTiles}`;
-                        
+
                         // Create a grid of tiles for visual feedback
                         for (let x = xMin; x <= xMax; x++) {
                             for (let y = yMin; y <= yMax; y++) {
@@ -357,88 +387,88 @@
                                 `;
                                 tileIndicator.innerText = `${x},${y}`;
                                 tileGrid.appendChild(tileIndicator);
-                                
+
                                 // Create a container for the tile image
                                 const tileContainer = document.createElement('div');
                                 tileContainer.style = 'position:absolute;left:-9999px;top:-9999px;width:256px;height:256px;';
                                 document.body.appendChild(tileContainer);
-                                
+
                                 // Get the tile URL directly using the layer's getTileUrl method
-                                const coords = {x: x, y: y, z: zoom};
+                                const coords = { x: x, y: y, z: zoom };
                                 const tileUrl = maastokarttaLayer.getTileUrl(coords);
-                                
-                                // Create a promise for this tile
-                                const promise = new Promise((resolveTile) => {
+
+                                // Create a task function for this tile
+                                const task = () => new Promise((resolveTile) => {
                                     const img = new Image();
-                                    
-                                    img.onload = function() {
+
+                                    img.onload = function () {
                                         loadedTiles++;
                                         tileIndicator.style.backgroundColor = '#00cc00'; // Green for success
                                         tileDebugElement.innerHTML = `Ladataan karttatiiliä: ${loadedTiles}/${totalTiles} (virheitä: ${errorTiles})`;
                                         resolveTile(true);
                                     };
-                                    
-                                    img.onerror = function() {
+
+                                    img.onerror = function () {
                                         errorTiles++;
                                         tileIndicator.style.backgroundColor = '#ff0000'; // Red for error
                                         tileDebugElement.innerHTML = `Ladataan karttatiiliä: ${loadedTiles}/${totalTiles} (virheitä: ${errorTiles})`;
                                         resolveTile(false);
                                     };
-                                    
+
                                     // Prevent caching issues by adding timestamp
                                     img.src = `${tileUrl}?t=${Date.now()}`;
-                                    
+
                                     // Add the image to the container
                                     tileContainer.appendChild(img);
                                 });
-                                
-                                // Store tile data for tracking and cleanup
-                                tilePromises.push(promise);
+
+                                // Store tile task
+                                tileTasks.push(task);
                                 tileContainerRefs.push(tileContainer);
                             }
                         }
-                        
+
                         // Log a warning if no tiles were found
-                        if (tilePromises.length === 0) {
+                        if (tileTasks.length === 0) {
                             console.warn("No tiles found in the specified area. Check coordinates and zoom level.");
                             tileDebugElement.innerHTML = "Varoitus: Ei tiiliä valitulla alueella";
-                            
+
                             // Clean up and resolve after a delay
                             setTimeout(() => {
                                 if (document.body.contains(tileDebugElement)) {
                                     document.body.removeChild(tileDebugElement);
                                 }
-                                
+
                                 if (document.body.contains(tileGrid)) {
                                     document.body.removeChild(tileGrid);
                                 }
-                                
+
                                 if (mapElement.contains(captureArea)) {
                                     mapElement.removeChild(captureArea);
                                 }
-                                
+
                                 map.removeLayer(tempLayer);
                                 resolve();
                             }, 2000);
-                            
+
                             return;
                         }
-                        
-                        console.log(`Starting to load ${tilePromises.length} tiles`);
-                        
-                        // Wait for all tiles to load or fail
-                        Promise.all(tilePromises).then(results => {
+
+                        console.log(`Starting to load ${tileTasks.length} tiles with concurrency limit`);
+
+                        // Wait for all tiles to load or fail with concurrency limit
+                        runWithConcurrency(tileTasks, 10).then(results => {
                             console.log(`Tile loading finished: ${loadedTiles} loaded, ${errorTiles} failed`);
-                            
+
                             // Ensure the map is fully rendered
                             map.invalidateSize();
-                            
+
                             // Force all existing Leaflet tiles to be visible
                             document.querySelectorAll('.leaflet-tile-container img').forEach(img => {
                                 img.style.visibility = 'visible';
                                 img.style.opacity = '1';
                             });
-                            
+
                             // Wait a bit more to ensure tiles are rendered
                             setTimeout(() => {
                                 // Clean up
@@ -446,52 +476,52 @@
                                 if (mapElement.contains(captureArea)) {
                                     mapElement.removeChild(captureArea);
                                 }
-                                
+
                                 if (document.body.contains(tileDebugElement)) {
                                     document.body.removeChild(tileDebugElement);
                                 }
-                                
+
                                 if (document.body.contains(tileGrid)) {
                                     document.body.removeChild(tileGrid);
                                 }
-                                
+
                                 // Clean up temporary tile containers
                                 tileContainerRefs.forEach(container => {
                                     if (document.body.contains(container)) {
                                         document.body.removeChild(container);
                                     }
                                 });
-                                
+
                                 resolve();
                             }, 2000);
                         }).catch(error => {
                             console.error("Error during tile loading:", error);
-                            
+
                             // Clean up
                             map.removeLayer(tempLayer);
-                            
+
                             if (document.body.contains(tileDebugElement)) {
                                 document.body.removeChild(tileDebugElement);
                             }
-                            
+
                             if (document.body.contains(tileGrid)) {
                                 document.body.removeChild(tileGrid);
                             }
-                            
+
                             if (mapElement.contains(captureArea)) {
                                 mapElement.removeChild(captureArea);
                             }
-                            
+
                             // Clean up temporary tile containers
                             tileContainerRefs.forEach(container => {
                                 if (document.body.contains(container)) {
                                     document.body.removeChild(container);
                                 }
                             });
-                            
+
                             reject(error);
                         });
-                        
+
                     } catch (e) {
                         console.error("Error in forceLoadTiles:", e);
                         reject(e);
@@ -500,17 +530,17 @@
             }
 
             // Optimized captureMapForPdf function for direct canvas rendering.
-            function captureMapForPdf(mapElement, pdfBox, boxCenterPoint, currentZoom, currentCenter, pdfZoomLevel, 
-                                    paperWidthMm, paperHeightMm, scale, pdf, pdfLoading, tileLayer) {
+            function captureMapForPdf(mapElement, pdfBox, boxCenterPoint, currentZoom, currentCenter, pdfZoomLevel,
+                paperWidthMm, paperHeightMm, scale, pdf, pdfLoading, tileLayer) {
                 return new Promise((resolve, reject) => {
                     try {
                         pdfLoading.innerHTML = "Renderoidaan karttaa kankaalle...";
-                        
+
                         // Create a manual canvas for direct tile rendering
                         const manualCanvas = document.createElement('canvas');
                         const boxRect = elements.pdfBox.getBoundingClientRect();
                         const mapRect = mapElement.getBoundingClientRect();
-                        
+
                         // Set canvas dimensions with high resolution
                         const scale_factor = 1; // For high resolution
                         const cropWidth = boxRect.width;
@@ -518,78 +548,78 @@
                         manualCanvas.width = cropWidth * scale_factor;
                         manualCanvas.height = cropHeight * scale_factor;
                         const ctx = manualCanvas.getContext('2d');
-                        
+
                         // Fill background with white
                         ctx.fillStyle = '#FFFFFF';
                         ctx.fillRect(0, 0, manualCanvas.width, manualCanvas.height);
-                        
+
                         // Get the area in geographical coordinates
                         const nw = map.containerPointToLatLng([
                             boxRect.left - mapRect.left,
                             boxRect.top - mapRect.top
                         ]);
-                        
+
                         const se = map.containerPointToLatLng([
                             boxRect.right - mapRect.left,
                             boxRect.bottom - mapRect.top
                         ]);
-                        
+
                         // Create bounds for the PDF area
                         const pdfBounds = L.latLngBounds(nw, se);
-                        
+
                         // Convert to tile coordinates
                         const zoom = pdfZoomLevel;
                         const tileSize = 256;
-                        
+
                         // Get the map projection bounds
                         const mapBoundsNW = map.project(pdfBounds.getNorthWest(), zoom);
                         const mapBoundsSE = map.project(pdfBounds.getSouthEast(), zoom);
-                        
+
                         // Calculate tile coordinates
                         const nwTilePoint = mapBoundsNW.divideBy(tileSize).floor();
                         const seTilePoint = mapBoundsSE.divideBy(tileSize).floor();
-                        
+
                         const xMin = Math.max(0, nwTilePoint.x);
                         const xMax = seTilePoint.x;
                         const yMin = Math.max(0, nwTilePoint.y);
                         const yMax = seTilePoint.y;
-                        
+
                         console.log(`Rendering tiles: x=${xMin}-${xMax}, y=${yMin}-${yMax}, z=${zoom}`);
-                        
+
                         // Use the NW corner as the origin reference point
                         const originPoint = mapBoundsNW;
-                        
+
                         // Count for progress tracking
                         const totalTiles = (xMax - xMin + 1) * (yMax - yMin + 1);
                         let loadedTiles = 0;
                         let errorTiles = 0;
-                        
+
                         // Create a progress indicator
                         const progressDiv = document.createElement('div');
                         progressDiv.style = "position:fixed;bottom:20px;left:20px;background:white;padding:10px;z-index:3000;";
                         progressDiv.innerHTML = "Ladataan karttatiiliä: 0/" + totalTiles;
                         document.body.appendChild(progressDiv);
-                        
-                        // Create promises for each tile
-                        const tilePromises = [];
-                        
+
+                        // Create tasks for each tile
+                        const tileTasks = [];
+
                         // Loop through all tiles in the area
                         for (let x = xMin; x <= xMax; x++) {
                             for (let y = yMin; y <= yMax; y++) {
                                 // Calculate position on the canvas
                                 const tileLeft = (x * tileSize - originPoint.x) * scale_factor;
                                 const tileTop = (y * tileSize - originPoint.y) * scale_factor;
-                                
+
                                 // Get the tile URL - use the passed tileLayer parameter instead of maastokarttaLayer
-                                const coords = {x: x, y: y, z: zoom};
+                                const coords = { x: x, y: y, z: zoom };
                                 const tileUrl = tileLayer.getTileUrl(coords);
-                                
-                                // Create a promise for this tile
-                                tilePromises.push(new Promise((resolveTile) => {
+
+                                // Create a task function for this tile
+                                const task = () => new Promise((resolveTile) => {
                                     const img = new Image();
                                     img.crossOrigin = 'Anonymous'; // To avoid CORS issues
-                                    
-                                    img.onload = function() {
+
+                                    img.onload = function () {
                                         try {
                                             ctx.drawImage(img, tileLeft, tileTop, tileSize * scale_factor, tileSize * scale_factor);
                                             loadedTiles++;
@@ -600,30 +630,32 @@
                                         }
                                         resolveTile();
                                     };
-                                    
-                                    img.onerror = function() {
+
+                                    img.onerror = function () {
                                         console.warn(`Failed to load tile: ${tileUrl}`);
                                         errorTiles++;
                                         progressDiv.innerHTML = `Ladataan karttatiiliä: ${loadedTiles}/${totalTiles} (virheitä: ${errorTiles})`;
                                         resolveTile();
                                     };
-                                    
+
                                     // Add cache buster to avoid browser caching
                                     img.src = `${tileUrl}?t=${Date.now()}`;
-                                }));
+                                });
+
+                                tileTasks.push(task);
                             }
                         }
-                        
-                        // Wait for all tiles to be drawn
-                        Promise.all(tilePromises)
+
+                        // Wait for all tiles to be drawn with concurrency limit
+                        runWithConcurrency(tileTasks, 10)
                             .then(() => {
                                 // Clean up the progress indicator
                                 if (document.body.contains(progressDiv)) {
                                     document.body.removeChild(progressDiv);
                                 }
-                                
+
                                 pdfLoading.innerHTML = "Luodaan PDF:ää...";
-                                
+
                                 // Add a visual summary to the canvas
                                 ctx.font = '20px Arial';
                                 ctx.fillStyle = 'rgba(255,255,255,0.7)';
@@ -631,40 +663,40 @@
                                 ctx.fillStyle = '#000000';
                                 ctx.fillText(`Tiles: ${loadedTiles}/${totalTiles} (errors: ${errorTiles})`, 20, manualCanvas.height - 50);
                                 ctx.fillText(`Zoom: ${zoom}, Scale: 1:${scale}`, 20, manualCanvas.height - 20);
-                                
+
                                 // Convert the canvas to an image
                                 const imgData = manualCanvas.toDataURL('image/png', 1.0);
-                                
+
                                 // Define the margin in mm
                                 const margin = 10;
-                                
+
                                 // Calculate image dimensions with margins
                                 const imageWidth = paperWidthMm - (margin * 2);
                                 const imageHeight = paperHeightMm - (margin * 2);
-                                
+
                                 // Add image to PDF with margins
                                 pdf.addImage(imgData, 'PNG', margin, margin, imageWidth, imageHeight, undefined, 'FAST');
-                                
+
                                 // Add black border around the map
                                 pdf.setDrawColor(0); // Black
                                 pdf.setLineWidth(0.5); // Line thickness
                                 pdf.rect(margin, margin, imageWidth, imageHeight);
-                                
+
                                 // Add metadata and attribution shifted to account for margin
                                 pdf.setFontSize(8);
                                 pdf.text(`Mittakaava 1:${scale}`, margin + 5, paperHeightMm - margin - 5);
-                                
+
                                 let attribution = 'Maastokartta © Maanmittauslaitos';
                                 pdf.setFontSize(6);
                                 pdf.text(attribution, margin + 5, paperHeightMm - margin - 10);
-                                
+
                                 const today = new Date().toLocaleDateString('fi-FI');
                                 pdf.text(`Päiväys: ${today}`, paperWidthMm - margin - 50, paperHeightMm - margin - 5);
-                                pdf.text(`Koordinaatit: ${boxCenterPoint.lat.toFixed(4)}, ${boxCenterPoint.lng.toFixed(4)}`, 
-                                        paperWidthMm - margin - 50, paperHeightMm - margin - 10);
-                                
+                                pdf.text(`Koordinaatit: ${boxCenterPoint.lat.toFixed(4)}, ${boxCenterPoint.lng.toFixed(4)}`,
+                                    paperWidthMm - margin - 50, paperHeightMm - margin - 10);
+
                                 // Removed Canvas Preview code
-                                
+
                                 resolve({
                                     pdf: pdf,
                                     filename: `maastokartta_${today.replace(/\./g, '')}.pdf`
@@ -677,7 +709,7 @@
                                 }
                                 reject(error);
                             });
-                        
+
                     } catch (e) {
                         console.error("Error in captureMapForPdf:", e);
                         reject(e);
@@ -691,14 +723,14 @@
                     // Define the Finnish Coordinate System EPSG:3067
                     const crs = new L.Proj.CRS(
                         'EPSG:3067',
-                        '+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs', 
+                        '+proj=utm +zone=35 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs',
                         {
                             resolutions: [8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 0.5, 0.25],
                             origin: [-548576, 8388608],
                             bounds: L.bounds([-548576, 6291456], [1548576, 8388608])
                         }
                     );
-                    
+
                     // Create map with the Finnish coordinate system
                     map = L.map('map', {
                         crs: crs,
@@ -726,18 +758,18 @@
                     map.fitBounds(finlandBounds, { animate: false });
 
                     // Multiple event listeners to catch zoom changes and movement
-                    map.on('moveend', function(e) {
+                    map.on('moveend', function (e) {
                         console.log("Map moveend event");
                         updatePdfBox();
                     });
-                    
-                    map.on('zoomend', function() {
+
+                    map.on('zoomend', function () {
                         console.log("Zoom change event");
                         updatePdfBox();
                     });
-                    
+
                     // Add key event listener to manually update box on +/- keys
-                    document.addEventListener('keydown', function(e) {
+                    document.addEventListener('keydown', function (e) {
                         if (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '_' || e.key === 'PageUp' || e.key === 'PageDown') {
                             setTimeout(updatePdfBox, 100);
                         }
@@ -745,18 +777,18 @@
 
                     // Fix the loading message: use both load and loadend events
                     let mapLoaded = false;
-                    
+
                     // Ensure loading message is hidden when map is ready
-                    map.whenReady(function() {
+                    map.whenReady(function () {
                         console.log("Map is ready");
                         elements.mapInfo.innerHTML = 'Maastokartta © Maanmittauslaitos';
                         document.getElementById('loading').style.display = 'none';
                         mapLoaded = true;
                         setTimeout(updatePdfBox, 100); // Ensure box is sized after initial rendering
                     });
-                    
+
                     // Additional safety to hide loading message after tiles load
-                    maastokarttaLayer.on('load', function() {
+                    maastokarttaLayer.on('load', function () {
                         console.log("Tiles loaded");
                         if (!mapLoaded) {
                             document.getElementById('loading').style.display = 'none';
@@ -764,7 +796,7 @@
                             updatePdfBox();
                         }
                     });
-                    
+
                     // Force hide loading message after timeout as failsafe
                     setTimeout(() => {
                         document.getElementById('loading').style.display = 'none';
@@ -774,298 +806,30 @@
                     const tileDebug = document.createElement('div');
                     tileDebug.style = "position:fixed;top:10px;right:10px;background:white;padding:5px;z-index:2000;font-size:10px;display:none;";
                     document.body.appendChild(tileDebug);
-                    
+
                     let loadedTiles = 0;
                     let errorTiles = 0;
-                    
+
                     function updateTileDebug() {
                         tileDebug.innerHTML = `Loaded: ${loadedTiles}, Failed: ${errorTiles}`;
                     }
 
                     // Track tile loading for Leaflet
-                    maastokarttaLayer.on('tileload', function() {
+                    maastokarttaLayer.on('tileload', function () {
                         loadedTiles++;
                         updateTileDebug();
                     });
-                    
-                    maastokarttaLayer.on('tileerror', function() {
+
+                    maastokarttaLayer.on('tileerror', function () {
                         errorTiles++;
                         updateTileDebug();
                         console.log('Maastokartta tile loading error');
-                        
+
                         // Show debug info if we're having lots of failures
                         if (errorTiles > 10) {
                             tileDebug.style.display = 'block';
                         }
                     });
-                    
-                    // Enhanced force loading of all tiles in the visible area before PDF capture
-                    function forceLoadTiles(zoomLevel) {
-                        return new Promise((resolve, reject) => {
-                            try {
-                                console.log("Starting direct tile preloading for zoom level:", zoomLevel);
-                                
-                                // Create a debug element to show tile loading progress
-                                const tileDebugElement = document.createElement('div');
-                                tileDebugElement.style = "position:fixed;bottom:40px;left:10px;background:rgba(255,255,255,0.9);padding:5px;z-index:2000;font-size:12px;";
-                                tileDebugElement.id = "tile-loading-debug";
-                                document.body.appendChild(tileDebugElement);
-                                
-                                // Get all the tile elements
-                                const tileContainers = document.querySelectorAll('.leaflet-tile-container');
-                                tileContainers.forEach(container => {
-                                    // Force opacity to 1 to ensure all tiles are visible
-                                    container.style.opacity = '1';
-                                });
-                                
-                                // Force the map to update
-                                map.invalidateSize();
-                                
-                                // Get the bounds of the pdf box in geographical coordinates
-                                const boxRect = elements.pdfBox.getBoundingClientRect();
-                                const mapElement = elements.map;
-                                const mapRect = mapElement.getBoundingClientRect();
-                                
-                                // Create a visual overlay to show the area being captured
-                                const captureArea = document.createElement('div');
-                                captureArea.style = `
-                                    position: absolute;
-                                    border: 3px solid blue;
-                                    z-index: 999;
-                                    pointer-events: none;
-                                    left: ${boxRect.left - mapRect.left}px;
-                                    top: ${boxRect.top - mapRect.top}px;
-                                    width: ${boxRect.width}px;
-                                    height: ${boxRect.height}px;
-                                `;
-                                mapElement.appendChild(captureArea);
-                                
-                                // Convert corners to geographical coordinates
-                                const nw = map.containerPointToLatLng([
-                                    boxRect.left - mapRect.left,
-                                    boxRect.top - mapRect.top
-                                ]);
-                                
-                                const se = map.containerPointToLatLng([
-                                    boxRect.right - mapRect.left,
-                                    boxRect.bottom - mapRect.top
-                                ]);
-                                
-                                // Create bounds for the PDF area
-                                const pdfBounds = L.latLngBounds(nw, se);
-                                
-                                // Use an alternative approach - create a temporary layer that covers this area
-                                const tempLayer = L.rectangle(pdfBounds, {
-                                    fill: false,
-                                    color: 'blue',
-                                    weight: 1,
-                                    opacity: 0.3,
-                                    interactive: false
-                                }).addTo(map);
-                                
-                                const zoom = zoomLevel || map.getZoom();
-                                
-                                // Create a visual grid to show tile loading progress
-                                const tileGrid = document.createElement('div');
-                                tileGrid.style = `
-                                    position: fixed;
-                                    bottom: 70px;
-                                    left: 10px;
-                                    background: rgba(255,255,255,0.9);
-                                    padding: 5px;
-                                    border: 1px solid #ccc;
-                                    z-index: 2001;
-                                    display: flex;
-                                    flex-wrap: wrap;
-                                    max-width: 600px;
-                                    max-height: 150px;
-                                    overflow: auto;
-                                `;
-                                document.body.appendChild(tileGrid);
-                                
-                                // Find the tile coordinates needed for this viewport area
-                                const mapBoundsNW = map.project(pdfBounds.getNorthWest(), zoom);
-                                const mapBoundsSE = map.project(pdfBounds.getSouthEast(), zoom);
-                                
-                                const tileSize = 256;
-                                
-                                // Calculate tile coordinates
-                                const nwTilePoint = mapBoundsNW.divideBy(tileSize).floor();
-                                const seTilePoint = mapBoundsSE.divideBy(tileSize).floor();
-                                
-                                const xMin = nwTilePoint.x;
-                                const xMax = seTilePoint.x;
-                                const yMin = nwTilePoint.y;
-                                const yMax = seTilePoint.y;
-                                
-                                console.log(`Tile coordinates: x=${xMin}-${xMax}, y=${yMin}-${yMax}, z=${zoom}`);
-                                
-                                // Track loading state
-                                const totalTiles = (xMax - xMin + 1) * (yMax - yMin + 1);
-                                let loadedTiles = 0;
-                                let errorTiles = 0;
-                                let tilePromises = [];
-                                let tileContainerRefs = [];
-                                
-                                tileDebugElement.innerHTML = `Ladataan karttatiiliä: 0/${totalTiles}`;
-                                
-                                // Create a grid of tiles for visual feedback
-                                for (let x = xMin; x <= xMax; x++) {
-                                    for (let y = yMin; y <= yMax; y++) {
-                                        // Create a visual indicator for this tile
-                                        const tileIndicator = document.createElement('div');
-                                        tileIndicator.style = `
-                                            width: 20px;
-                                            height: 20px;
-                                            margin: 2px;
-                                            background-color: #ffcc00;
-                                            text-align: center;
-                                            font-size: 10px;
-                                            line-height: 20px;
-                                        `;
-                                        tileIndicator.innerText = `${x},${y}`;
-                                        tileGrid.appendChild(tileIndicator);
-                                        
-                                        // Create a container for the tile image
-                                        const tileContainer = document.createElement('div');
-                                        tileContainer.style = 'position:absolute;left:-9999px;top:-9999px;width:256px;height:256px;';
-                                        document.body.appendChild(tileContainer);
-                                        
-                                        // Get the tile URL directly using the layer's getTileUrl method
-                                        const coords = {x: x, y: y, z: zoom};
-                                        const tileUrl = maastokarttaLayer.getTileUrl(coords);
-                                        
-                                        // Create a promise for this tile
-                                        const promise = new Promise((resolveTile) => {
-                                            const img = new Image();
-                                            
-                                            img.onload = function() {
-                                                loadedTiles++;
-                                                tileIndicator.style.backgroundColor = '#00cc00'; // Green for success
-                                                tileDebugElement.innerHTML = `Ladataan karttatiiliä: ${loadedTiles}/${totalTiles} (virheitä: ${errorTiles})`;
-                                                resolveTile(true);
-                                            };
-                                            
-                                            img.onerror = function() {
-                                                errorTiles++;
-                                                tileIndicator.style.backgroundColor = '#ff0000'; // Red for error
-                                                tileDebugElement.innerHTML = `Ladataan karttatiiliä: ${loadedTiles}/${totalTiles} (virheitä: ${errorTiles})`;
-                                                resolveTile(false);
-                                            };
-                                            
-                                            // Prevent caching issues by adding timestamp
-                                            img.src = `${tileUrl}?t=${Date.now()}`;
-                                            
-                                            // Add the image to the container
-                                            tileContainer.appendChild(img);
-                                        });
-                                        
-                                        // Store tile data for tracking and cleanup
-                                        tilePromises.push(promise);
-                                        tileContainerRefs.push(tileContainer);
-                                    }
-                                }
-                                
-                                // Log a warning if no tiles were found
-                                if (tilePromises.length === 0) {
-                                    console.warn("No tiles found in the specified area. Check coordinates and zoom level.");
-                                    tileDebugElement.innerHTML = "Varoitus: Ei tiiliä valitulla alueella";
-                                    
-                                    // Clean up and resolve after a delay
-                                    setTimeout(() => {
-                                        if (document.body.contains(tileDebugElement)) {
-                                            document.body.removeChild(tileDebugElement);
-                                        }
-                                        
-                                        if (document.body.contains(tileGrid)) {
-                                            document.body.removeChild(tileGrid);
-                                        }
-                                        
-                                        if (mapElement.contains(captureArea)) {
-                                            mapElement.removeChild(captureArea);
-                                        }
-                                        
-                                        map.removeLayer(tempLayer);
-                                        resolve();
-                                    }, 2000);
-                                    
-                                    return;
-                                }
-                                
-                                console.log(`Starting to load ${tilePromises.length} tiles`);
-                                
-                                // Wait for all tiles to load or fail
-                                Promise.all(tilePromises).then(results => {
-                                    console.log(`Tile loading finished: ${loadedTiles} loaded, ${errorTiles} failed`);
-                                    
-                                    // Ensure the map is fully rendered
-                                    map.invalidateSize();
-                                    
-                                    // Force all existing Leaflet tiles to be visible
-                                    document.querySelectorAll('.leaflet-tile-container img').forEach(img => {
-                                        img.style.visibility = 'visible';
-                                        img.style.opacity = '1';
-                                    });
-                                    
-                                    // Wait a bit more to ensure tiles are rendered
-                                    setTimeout(() => {
-                                        // Clean up
-                                        map.removeLayer(tempLayer);
-                                        if (mapElement.contains(captureArea)) {
-                                            mapElement.removeChild(captureArea);
-                                        }
-                                        
-                                        if (document.body.contains(tileDebugElement)) {
-                                            document.body.removeChild(tileDebugElement);
-                                        }
-                                        
-                                        if (document.body.contains(tileGrid)) {
-                                            document.body.removeChild(tileGrid);
-                                        }
-                                        
-                                        // Clean up temporary tile containers
-                                        tileContainerRefs.forEach(container => {
-                                            if (document.body.contains(container)) {
-                                                document.body.removeChild(container);
-                                            }
-                                        });
-                                        
-                                        resolve();
-                                    }, 2000);
-                                }).catch(error => {
-                                    console.error("Error during tile loading:", error);
-                                    
-                                    // Clean up
-                                    map.removeLayer(tempLayer);
-                                    
-                                    if (document.body.contains(tileDebugElement)) {
-                                        document.body.removeChild(tileDebugElement);
-                                    }
-                                    
-                                    if (document.body.contains(tileGrid)) {
-                                        document.body.removeChild(tileGrid);
-                                    }
-                                    
-                                    if (mapElement.contains(captureArea)) {
-                                        mapElement.removeChild(captureArea);
-                                    }
-                                    
-                                    // Clean up temporary tile containers
-                                    tileContainerRefs.forEach(container => {
-                                        if (document.body.contains(container)) {
-                                            document.body.removeChild(container);
-                                        }
-                                    });
-                                    
-                                    reject(error);
-                                });
-                                
-                            } catch (e) {
-                                console.error("Error in forceLoadTiles:", e);
-                                reject(e);
-                            }
-                        });
-                    }
 
                     // Add a listener for the PDF button that prepares the map
                     elements.generatePdfButton.addEventListener('mousedown', () => {
@@ -1082,22 +846,22 @@
                             const paperSize = elements.paperSizeSelect.value;
                             const orientation = elements.orientationSelect.value;
                             const pdfZoomLevel = parseInt(elements.pdfZoomSelect.value);
-                            
+
                             // Store current map state to restore after PDF generation
                             const currentZoom = map.getZoom();
                             const currentCenter = map.getCenter();
-                            
+
                             // Hide the info text and PDF box border
                             elements.mapInfo.style.display = 'none';
-                            
+
                             // Define paper dimensions
                             let paperWidthMm = PAPER_SIZES[paperSize].width;
                             let paperHeightMm = PAPER_SIZES[paperSize].height;
-                            
+
                             if (orientation === 'landscape') {
                                 [paperWidthMm, paperHeightMm] = [paperHeightMm, paperWidthMm];
                             }
-                            
+
                             // Create PDF instance
                             const { jsPDF } = window.jspdf;
                             const pdf = new jsPDF({
@@ -1105,38 +869,38 @@
                                 unit: 'mm',
                                 format: paperSize
                             });
-                            
+
                             // Add loading indicator
                             const pdfLoading = document.createElement('div');
                             pdfLoading.style = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.9);padding:20px;border-radius:5px;z-index:2000;";
                             pdfLoading.innerHTML = "Valmistellaan karttaa PDF:ää varten...";
                             document.body.appendChild(pdfLoading);
-                            
+
                             // Calculate capture area
                             const boxRect = elements.pdfBox.getBoundingClientRect();
                             const mapElement = elements.map;
                             const mapRect = mapElement.getBoundingClientRect();
-                            
+
                             // Get center coordinates of PDF box
                             const boxCenterPoint = map.containerPointToLatLng([
                                 boxRect.left - mapRect.left + boxRect.width / 2,
                                 boxRect.top - mapRect.top + boxRect.height / 2
                             ]);
-                            
+
                             try {
                                 // Change zoom level if needed
                                 if (pdfZoomLevel !== currentZoom) {
                                     pdfLoading.innerHTML = "Muutetaan kartan tarkkuutta...";
-                                    map.setView(boxCenterPoint, pdfZoomLevel, {animate: false});
-                                    
+                                    map.setView(boxCenterPoint, pdfZoomLevel, { animate: false });
+
                                     // Allow time for zoom to complete
                                     await new Promise(resolve => setTimeout(resolve, 1000));
                                 }
-                                
+
                                 // Force load all tiles
                                 pdfLoading.innerHTML = "Ladataan karttatiiliä...";
                                 await forceLoadTiles(pdfZoomLevel);
-                                
+
                                 // Capture the map - pass maastokarttaLayer as a parameter
                                 pdfLoading.innerHTML = "Luodaan korkealaatuista PDF:ää...";
                                 const result = await captureMapForPdf(
@@ -1144,27 +908,27 @@
                                     pdfZoomLevel, paperWidthMm, paperHeightMm, scale, pdf, pdfLoading,
                                     maastokarttaLayer // Pass the layer as parameter
                                 );
-                                
+
                                 // Save the PDF
                                 result.pdf.save(result.filename);
-                                
+
                             } catch (error) {
                                 console.error("Error during PDF generation:", error);
                                 alert("Virhe PDF:n luomisessa: " + error.message);
                             } finally {
                                 // Always restore the UI state
                                 if (pdfZoomLevel !== currentZoom) {
-                                    map.setView(currentCenter, currentZoom, {animate: false});
+                                    map.setView(currentCenter, currentZoom, { animate: false });
                                 }
-                                
+
                                 elements.mapInfo.style.display = 'block';
                                 elements.pdfBox.style.borderStyle = 'dashed';
-                                
+
                                 if (document.body.contains(pdfLoading)) {
                                     document.body.removeChild(pdfLoading);
                                 }
                             }
-                            
+
                         } catch (e) {
                             console.error("Virhe PDF:n generoimisessa:", e);
                             alert("Virhe PDF:n luomisessa: " + e.message);
@@ -1180,31 +944,23 @@
                     elements.pdfZoomSelect.addEventListener('change', () => {
                         console.log("PDF zoom changed:", elements.pdfZoomSelect.value);
                     });
-                    
-                    // Initialize PDF box after a short delay
-                    //setTimeout(updatePdfBox, 1000);
-                    
+
                     // Handle window resize
                     window.addEventListener('resize', () => {
                         setTimeout(updatePdfBox, 100);
                     });
-                    
+
                     // Force update of PDF box during interactive sessions
                     let lastInteraction = Date.now();
                     document.addEventListener('mousemove', () => { lastInteraction = Date.now(); });
                     document.addEventListener('click', () => { lastInteraction = Date.now(); });
                     document.addEventListener('keypress', () => { lastInteraction = Date.now(); });
-                    
-                    setInterval(() => {
-                        // Only update regularly if there has been interaction in the last 10 seconds
-                        if (Date.now() - lastInteraction < 10000) {
-                            updatePdfBox();
-                        }
-                    }, 1000);
-                    
+
+                    // Removed setInterval polling loop
+
                 } catch (e) {
                     console.error("Virhe kartan alustamisessa:", e);
-                    document.body.insertAdjacentHTML('afterbegin', 
+                    document.body.insertAdjacentHTML('afterbegin',
                         `<div style="color:red;position:fixed;top:70px;left:10px;background:white;padding:5px;z-index:2000;">
                             Virhe kartan alustamisessa: ${e.message}
                         </div>`);
@@ -1214,4 +970,5 @@
         });
     </script>
 </body>
+
 </html>
