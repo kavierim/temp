@@ -602,18 +602,8 @@
 
                                 pdfLoading.innerHTML = "Luodaan PDF:ää...";
 
-                                // Add a visual summary to the canvas
-                                ctx.font = '20px Arial';
-                                ctx.fillStyle = 'rgba(255,255,255,0.7)';
-                                ctx.fillRect(10, manualCanvas.height - 80, 300, 70);
-                                ctx.fillStyle = '#000000';
-                                ctx.fillText(`Tiles: ${loadedTiles}/${totalTiles} (errors: ${errorTiles})`, 20, manualCanvas.height - 50);
-                                ctx.fillText(`Zoom: ${zoom}, Scale: 1:${scale}`, 20, manualCanvas.height - 20);
-
                                 // Convert the canvas to an image
                                 const imgData = manualCanvas.toDataURL('image/png', 1.0);
-
-                                // Define the margin in mm
                                 const margin = 10;
 
                                 // Calculate image dimensions with margins
@@ -627,6 +617,10 @@
                                 pdf.setDrawColor(0); // Black
                                 pdf.setLineWidth(0.5); // Line thickness
                                 pdf.rect(margin, margin, imageWidth, imageHeight);
+
+                                // Add white background for metadata
+                                pdf.setFillColor(255, 255, 255);
+                                pdf.rect(margin + 2, paperHeightMm - margin - 14, 60, 12, 'F');
 
                                 // Add metadata and attribution shifted to account for margin
                                 pdf.setFontSize(8);
