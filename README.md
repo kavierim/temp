@@ -12,6 +12,7 @@ This repository contains various small code trials and experiments. It serves as
 - [Chatbot](https://kavierim.github.io/temp/Chatbot.html): A browser-based chatbot using Transformers.js.
 - [Image to HTML Generator](https://kavierim.github.io/temp/Image2HTML.html): Convert an image into an HTML page using a local model. Runs 100% in your browser.
 - [Text to Speech](https://kavierim.github.io/temp/TextToSpeech.html): Generate speech from text directly in your browser using Transformers.js.
+- [Viikkokalenteri](https://kavierim.github.io/temp/Viikkokalenteri.html): A Finnish weekly calendar with name days, holidays, and weather information.
 
 ## How to Use
 
@@ -31,6 +32,7 @@ For example:
 - https://kavierim.github.io/temp/Chatbot.html
 - https://kavierim.github.io/temp/Image2HTML.html
 - https://kavierim.github.io/temp/TextToSpeech.html
+- https://kavierim.github.io/temp/Viikkokalenteri.html
 
 ## Contributing
 

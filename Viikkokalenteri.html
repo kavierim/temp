@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viikkokalenteri</title>
+    
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Konfiguraatio -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    screens: {
+                        'print': {'raw': 'print'},
+                    },
+                    colors: {
+                        'calendar-bg': '#ffffff',
+                        'calendar-header': '#f3f4f6',
+                        'weekend': '#f9fafb',
+                        'holiday': '#fef2f2',
+                        'today': '#e0f2fe',
+                        'event-box': '#fffbeb',
+                        'event-text': '#92400e'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Määritellään kustomoitu grid: VKO on puolet muiden sarakkeiden leveydestä */
+        .custom-grid {
+            display: grid;
+            grid-template-columns: 0.5fr repeat(7, 1fr);
+        }
+
+        @media print {
+            @page {
+                size: landscape;
+                margin: 1cm;
+            }
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .no-print {
+                display: none !important;
+            }
+            /* Piilota kahva tulosteessa */
+            #resize-handle {
+                display: none !important;
+            }
+            /* Pakota grid tulosteessa oikeaan suhteeseen */
+            .custom-grid {
+                display: grid !important;
+                grid-template-columns: 0.5fr repeat(7, 1fr) !important;
+            }
+            /* Piilota modaali tulosteessa */
+            #day-modal, #location-modal {
+                display: none !important;
+            }
+        }
+        .scrolling-wrapper {
+            -webkit-overflow-scrolling: touch;
+        }
+        /* Estä tekstin valinta vetämisen aikana */
+        .noselect {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        /* Custom scrollbar for modal content */
+        .modal-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .modal-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        .modal-scroll::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        .modal-scroll::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen p-4 md:p-8">
+
+    <div id="app" class="max-w-7xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden border border-gray-200 flex flex-col relative">
+        
+        <!-- Header -->
+        <header class="bg-white p-6 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">📅 Viikkokalenteri</h1>
+                <p class="text-sm text-gray-500 mt-1">2025–2026 • ISO 8601 • Sää & Aurinko • Liputuspäivät</p>
+            </div>
+            
+            <div class="flex items-center gap-4 no-print">
+                <button id="btn-today" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center gap-2">
+                    <span>📅</span> Tänään
+                </button>
+                <div class="flex rounded-md shadow-sm">
+                    <button id="btn-prev" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        ← Edellinen
+                    </button>
+                    <button id="btn-next" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        Seuraava →
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Kalenteri -->
+        <div class="overflow-x-auto scrolling-wrapper flex-grow">
+            <!-- Grid Header -->
+            <div class="custom-grid bg-calendar-header border-b border-gray-200 min-w-[900px]">
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">VKO</div>
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">Maanantai</div>
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">Tiistai</div>
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">Keskiviikko</div>
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">Torstai</div>
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">Perjantai</div>
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200 text-red-600">Lauantai</div>
+                <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center text-red-600">Sunnuntai</div>
+            </div>
+
+            <!-- Dynaaminen sisältö -->
+            <div id="calendar-grid" class="custom-grid min-w-[900px]">
+                <!-- Javascript täyttää solut -->
+            </div>
+        </div>
+
+        <!-- Resize Handle -->
+        <div id="resize-handle" class="h-6 bg-gray-100 border-t border-b border-gray-200 cursor-ns-resize flex justify-center items-center hover:bg-gray-200 transition-colors no-print" title="Vedä muuttaaksesi viikkomäärää">
+            <div class="flex gap-1">
+                <div class="w-8 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-gray-50 p-4 border-t border-gray-200 text-xs text-gray-500 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-[10px] text-gray-400 max-w-xl leading-relaxed">
+                Suomalainen kalenteri 2025–2026 • Viikkonumerot • Nimipäivät • Juhlapyhät • Liputuspäivät • Sääennuste ja sademäärät • Auringon nousu ja lasku • Kuun vaiheet • Vuosikalenteri ja viikkokalenteri netissä ilmainen • Tulostettava kalenteri.
+            </div>
+            
+            <div class="flex items-center gap-3 no-print">
+                <!-- Sijainnin vaihto (IKONI) -->
+                <button id="open-location-modal" class="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 text-lg flex items-center justify-center hover:bg-blue-100 transition-colors shadow-sm text-blue-600" title="Vaihda sijainti">
+                    📍
+                </button>
+
+                <!-- Astro kytkin (IKONI) -->
+                <button id="astro-toggle-btn" class="focus:outline-none transition-transform active:scale-95" title="Kuun vaiheet ja aurinko"></button>
+
+                <!-- Sään kytkin (IKONI) -->
+                <button id="weather-toggle-btn" class="focus:outline-none transition-transform active:scale-95" title="Sää päälle/pois"></button>
+                
+                <div id="weather-status" class="hidden md:block border-l pl-4 border-gray-300 text-gray-400">Säädata: Odotetaan...</div>
+            </div>
+        </footer>
+
+        <!-- PÄIVÄ MODAALI (Overlay) -->
+        <div id="day-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center backdrop-blur-sm p-4 no-print">
+            <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <!-- Modal Header -->
+                <div class="bg-gray-50 p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
+                    <div>
+                        <h2 id="modal-date-title" class="text-2xl font-bold text-gray-800"></h2>
+                        <p id="modal-subtitle" class="text-sm text-gray-500"></p>
+                    </div>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-200 transition">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                
+                <!-- Tietolaatikot -->
+                <div class="p-6 pb-2 flex-shrink-0 border-b border-gray-100 shadow-sm z-10 bg-white">
+                    <div id="modal-special-event-box" class="hidden mb-4 bg-yellow-50 p-4 rounded-lg border border-yellow-100 flex items-center gap-3"></div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-bold text-blue-800 uppercase mb-2">Auringon kierto</h3>
+                            <div id="modal-sun-info" class="flex items-center gap-4 text-sm"></div>
+                        </div>
+                        <div class="bg-indigo-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-bold text-indigo-800 uppercase mb-2">Nimipäivät</h3>
+                            <div id="modal-namedays" class="text-sm text-gray-700"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Säätaulukko -->
+                <div class="flex flex-col min-h-0 flex-grow bg-white">
+                    <div class="px-6 pt-4 pb-2 bg-gray-50/50 border-b border-gray-200 flex-shrink-0">
+                        <h3 id="modal-weather-title" class="font-bold text-gray-800 mb-2 flex items-center gap-2 text-sm">
+                            <span>🕒</span> Tuntikohtainen sääennuste
+                        </h3>
+                        <div class="grid grid-cols-[3rem_1fr_1fr_1fr_1fr] gap-2 text-xs font-bold text-gray-500 px-2">
+                            <div>Kello</div>
+                            <div class="text-center">Sää</div>
+                            <div class="text-center">Lämpötila</div>
+                            <div class="text-center">Sade</div>
+                            <div class="text-center">Tuuli</div>
+                        </div>
+                    </div>
+                    
+                    <div class="px-6 pb-6 overflow-y-auto modal-scroll flex-grow">
+                        <div id="modal-hourly-forecast" class="space-y-0 divide-y divide-gray-100">
+                            <!-- JS täyttää rivit -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIJAINTI MODAALI -->
+        <div id="location-modal" class="fixed inset-0 bg-black/50 hidden z-50 flex justify-center items-center backdrop-blur-sm p-4 no-print">
+            <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Aseta sijainti</h2>
+                <p class="text-xs text-gray-500 mb-4">Sijainti vaikuttaa sääennusteeseen sekä auringon nousu- ja laskuaikoihin.</p>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Valitse kaupunki</label>
+                    <select id="city-select" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="custom">Muu (Syötä koordinaatit)</option>
+                        <option value="60.17,24.94" selected>Helsinki</option>
+                        <option value="60.20,24.66">Espoo</option>
+                        <option value="61.50,23.79">Tampere</option>
+                        <option value="60.29,25.04">Vantaa</option>
+                        <option value="65.01,25.47">Oulu</option>
+                        <option value="60.45,22.27">Turku</option>
+                        <option value="62.24,25.75">Jyväskylä</option>
+                        <option value="62.89,27.68">Kuopio</option>
+                        <option value="60.98,25.66">Lahti</option>
+                        <option value="66.50,25.73">Rovaniemi</option>
+                        <option value="63.10,21.62">Vaasa</option>
+                        <option value="62.60,29.76">Joensuu</option>
+                        <option value="67.42,26.58">Sodankylä</option>
+                        <option value="69.90,27.03">Utsjoki</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Leveysaste (Lat)</label>
+                        <input type="number" id="lat-input" step="0.01" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500" value="60.17">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Pituusaste (Lon)</label>
+                        <input type="number" id="lon-input" step="0.01" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500" value="24.94">
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <div class="flex gap-2 justify-end pt-2 border-t border-gray-100">
+                        <button id="cancel-location" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Peruuta</button>
+                        <button id="save-location" class="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-md font-medium transition-colors shadow-sm">Tallenna</button>
+                    </div>
+                    <div class="mt-2 text-center">
+                        <button id="use-gps" class="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center justify-center gap-1 w-full py-1">
+                            <span>📍</span> Hae sijaintini (GPS)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SCRIPT -->
+    <script>
+        // --- APUFUNKTIO: Suomen lipun SVG ---
+        function getFlagSvg(classes = "w-3.5 h-2.5") {
+            return `<svg class="${classes} inline-block shadow-sm align-baseline" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 11"><rect width="18" height="11" fill="#fff"/><rect width="18" height="3" y="4" fill="#003580"/><rect width="3" height="11" x="5" fill="#003580"/></svg>`;
+        }
+
+        // 1. DATASETS
+        // Laajennettu HOLIDAYS sisältämään koko vuosi 2025 ja 2026
+        const HOLIDAYS = {
+            // 2025
+            "2025-01-01": "Uudenvuodenpäivä", "2025-01-06": "Loppiainen",
+            "2025-04-18": "Pitkäperjantai", "2025-04-20": "Pääsiäispäivä", "2025-04-21": "2. pääsiäispäivä",
+            "2025-05-01": "Vappu", "2025-05-29": "Helatorstai", "2025-06-08": "Helluntai",
+            "2025-06-20": "Juhannusaatto", "2025-06-21": "Juhannuspäivä",
+            "2025-11-01": "Pyhäinpäivä",
+            "2025-12-06": "Itsenäisyyspäivä", "2025-12-24": "Jouluaatto", "2025-12-25": "Joulupäivä", "2025-12-26": "Tapaninpäivä",
+            // 2026
+            "2026-01-01": "Uudenvuodenpäivä", "2026-01-06": "Loppiainen", 
+            "2026-04-03": "Pitkäperjantai", "2026-04-05": "Pääsiäispäivä", "2026-04-06": "2. pääsiäispäivä", 
+            "2026-05-01": "Vappu", "2026-05-14": "Helatorstai", "2026-05-24": "Helluntai",
+            "2026-06-19": "Juhannusaatto", "2026-06-20": "Juhannuspäivä", 
+            "2026-10-31": "Pyhäinpäivä",
+            "2026-12-06": "Itsenäisyyspäivä", "2026-12-24": "Jouluaatto", "2026-12-25": "Joulupäivä", "2026-12-26": "Tapaninpäivä"
+        };
+
+        const SPECIAL_EVENTS_DB = {
+            "3.2.": { text: "Alvar ja Aino Aallon päivä", type: 'flag' }, // UUSI
+            "5.2.": { text: "J.L. Runebergin päivä", type: 'flag' }, 
+            "6.2.": { text: "Saamelaisten kansallispäivä", type: 'flag' },
+            "14.2.": { text: "Ystävänpäivä", type: 'world' }, "28.2.": { text: "Kalevalan päivä", type: 'flag' },
+            "8.3.": { text: "Naistenpäivä", type: 'world' }, "19.3.": { text: "Minna Canthin päivä", type: 'flag' },
+            "17.3.": { text: "Pyhän Patrickin päivä", type: 'world' }, 
+            "8.4.": { text: "Romanien kansallispäivä", type: 'flag' }, "9.4.": { text: "Mikael Agricolan päivä", type: 'flag' },
+            "27.4.": { text: "Kansallinen veteraanipäivä", type: 'flag' }, "9.5.": { text: "Eurooppa-päivä", type: 'flag' },
+            "12.5.": { text: "J.V. Snellmanin päivä", type: 'flag' }, "4.6.": { text: "Puolustusvoimain lippujuhla", type: 'flag' },
+            "6.7.": { text: "Eino Leinon päivä", type: 'flag' }, 
+            "9.8.": { text: "Tove Janssonin päivä", type: 'flag' }, // UUSI
+            "1.10.": { text: "Miina Sillanpään päivä", type: 'flag' }, // UUSI
+            "10.10.": { text: "Aleksis Kiven päivä", type: 'flag' },
+            "24.10.": { text: "YK:n päivä", type: 'flag' }, "31.10.": { text: "Halloween", type: 'world' },
+            "6.11.": { text: "Ruotsalaisuuden päivä", type: 'flag' },
+            "20.11.": { text: "Lapsen oikeuksien päivä", type: 'flag' }, "8.12.": { text: "Jean Sibeliuksen päivä", type: 'flag' },
+            "13.12.": { text: "Lucian päivä", type: 'world' } // UUSI
+        };
+
+        const NAMEDAYS = {
+            "1.1.": "", "2.1.": "Aapeli", "3.1.": "Elmo, Elmer", "4.1.": "Ruut", "5.1.": "Lea, Leea", "6.1.": "Harri", "7.1.": "Aku, Aukusti", "8.1.": "Titta, Hilppa", "9.1.": "Veikko, Veli", "10.1.": "Nyyrikki",
+            "11.1.": "Kari, Karri", "12.1.": "Toini", "13.1.": "Nuutti", "14.1.": "Sakari, Saku", "15.1.": "Solja", "16.1.": "Ilmari, Ilmo", "17.1.": "Toni, Anton", "18.1.": "Laura", "19.1.": "Heikki, Henrik", "20.1.": "Sebastian",
+            "21.1.": "Aune, Oona", "22.1.": "Visa", "23.1.": "Enni, Eine", "24.1.": "Senja", "25.1.": "Paavo, Pauli", "26.1.": "Joonatan", "27.1.": "Viljo", "28.1.": "Kaarlo, Kalle", "29.1.": "Valtteri", "30.1.": "Irja", "31.1.": "Alli",
+            "1.2.": "Riitta", "2.2.": "Jemina, Aamu", "3.2.": "Valo, Hugo", "4.2.": "Armi, Ronja", "5.2.": "Päivi", "6.2.": "Terhi, Teija", "7.2.": "Riku, Rikhard", "8.2.": "Laina", "9.2.": "Raija, Raisa", "10.2.": "Elina",
+            "11.2.": "Talvikki, Isa", "12.2.": "Elma, Elmi", "13.2.": "Sulo, Sulho", "14.2.": "Voitto, Valentin", "15.2.": "Sipi, Sippo", "16.2.": "Kai", "17.2.": "Väinö, Väinämö", "18.2.": "Kaino", "19.2.": "Eija", "20.2.": "Heli, Helinä, Heljä",
+            "21.2.": "Keijo", "22.2.": "Tuulikki, Hilda", "23.2.": "Aslak", "24.2.": "Matti, Matias", "25.2.": "Tuija", "26.2.": "Nestori", "27.2.": "Torsti", "28.2.": "Onni", "29.2.": "",
+            "1.3.": "Alpo", "2.3.": "Virve, Virva", "3.3.": "Kauko", "4.3.": "Ari, Arsi", "5.3.": "Laila, Leila", "6.3.": "Tarmo", "7.3.": "Tarja, Taru", "8.3.": "Vilppu", "9.3.": "Edvin", "10.3.": "Aurora, Aura",
+            "11.3.": "Kalervo", "12.3.": "Reijo", "13.3.": "Erno, Tarvo", "14.3.": "Matilda, Tilda", "15.3.": "Risto", "16.3.": "Ilkka", "17.3.": "Kerttu, Kerttuli", "18.3.": "Eetu, Edvard", "19.3.": "Juuso, Josefiina", "20.3.": "Aki, Joakim",
+            "21.3.": "Pentti", "22.3.": "Vihtori", "23.3.": "Akseli", "24.3.": "Kaapo, Gabriel", "25.3.": "Aija", "26.3.": "Manu, Manne", "27.3.": "Sauli, Saul", "28.3.": "Armas", "29.3.": "Joonas, Jouni", "30.3.": "Usko", "31.3.": "Irma, Irmeli",
+            "1.4.": "Raita, Pulmu", "2.4.": "Pellervo", "3.4.": "Sampo", "4.4.": "Ukko", "5.4.": "Irene, Irina", "6.4.": "Ville, Vilho", "7.4.": "Allan, Ahvo", "8.4.": "Suoma", "9.4.": "Elias, Eelis", "10.4.": "Tero",
+            "11.4.": "Verna, Minea", "12.4.": "Julius, Julia", "13.4.": "Tellervo", "14.4.": "Taito", "15.4.": "Linda, Tuomi", "16.4.": "Jalo, Patrik", "17.4.": "Otto", "18.4.": "Valto, Valdemar", "19.4.": "Pälvi, Pilvi", "20.4.": "Nella, Lauha",
+            "21.4.": "Anssi, Anselmi", "22.4.": "Alina", "23.4.": "Yrjö, Jyrki", "24.4.": "Pertti, Albert", "25.4.": "Markku, Markus", "26.4.": "Terttu, Teresa", "27.4.": "Merja", "28.4.": "Ilpo", "29.4.": "Teijo", "30.4.": "Mirja, Miia",
+            "1.5.": "Vappu, Valpuri", "2.5.": "Vuokko, Viivi", "3.5.": "Outi", "4.5.": "Ruusu, Roosa", "5.5.": "Maini", "6.5.": "Ylermi", "7.5.": "Helmi", "8.5.": "Heino", "9.5.": "Timo", "10.5.": "Aino, Aini",
+            "11.5.": "Osmo", "12.5.": "Lotta", "13.5.": "Kukka, Flora", "14.5.": "Tuula", "15.5.": "Sofia, Sonja", "16.5.": "Ester, Essi", "17.5.": "Maila, Maili", "18.5.": "Erkki, Eero", "19.5.": "Emilia, Emma", "20.5.": "Lilja, Karoliina",
+            "21.5.": "Kosti, Konsta", "22.5.": "Hemminki, Hemmo", "23.5.": "Lyydia, Lyyli", "24.5.": "Tuukka, Touko", "25.5.": "Urpo", "26.5.": "Minna, Vilma, Miina", "27.5.": "Ritva", "28.5.": "Alma", "29.5.": "Oiva, Oivi", "30.5.": "Pasi", "31.5.": "Helka, Helga",
+            "1.6.": "Teemu, Niklas", "2.6.": "Venla", "3.6.": "Viola, Orvokki", "4.6.": "Toivo", "5.6.": "Sulevi", "6.6.": "Kustaa, Kyösti", "7.6.": "Suvi, Roope", "8.6.": "Salomon, Salomo", "9.6.": "Ensio", "10.6.": "Seppo",
+            "11.6.": "Impi, Iida", "12.6.": "Esko", "13.6.": "Raili, Raila", "14.6.": "Kielo", "15.6.": "Vieno, Viena", "16.6.": "Päivö, Päiviö", "17.6.": "Urho", "18.6.": "Tapio", "19.6.": "Siiri", "20.6.": "Into",
+            "21.6.": "Ahti, Ahto", "22.6.": "Paula, Pauliina", "23.6.": "Aatto", "24.6.": "Johannes, Juhani", "25.6.": "Uuno", "26.6.": "Jorma, Jarmo", "27.6.": "Elviira, Elvi", "28.6.": "Leo", "29.6.": "Pekka, Petri", "30.6.": "Päiviö, Päivö",
+            "1.7.": "Aaro, Aaron", "2.7.": "Maria, Mari", "3.7.": "Arvo", "4.7.": "Ulla, Ulpu", "5.7.": "Unto, Untamo", "6.7.": "Esa, Esaias", "7.7.": "Klaus, Launo", "8.7.": "Turo, Turkka", "9.7.": "Jasmin, Ilta", "10.7.": "Saima, Saimi",
+            "11.7.": "Elli, Noora", "12.7.": "Hermanni, Herkko", "13.7.": "Joel, Ilari", "14.7.": "Aliisa", "15.7.": "Rauni, Rauna", "16.7.": "Reino", "17.7.": "Ossi", "18.7.": "Riikka", "19.7.": "Sari, Saara", "20.7.": "Maarit, Reetta",
+            "21.7.": "Johanna, Hanna", "22.7.": "Leena, Matleena", "23.7.": "Olli", "24.7.": "Kristiina, Tiina", "25.7.": "Jaakko, Jaakoppi", "26.7.": "Martta", "27.7.": "Heidi", "28.7.": "Atso", "29.7.": "Olavi, Olli", "30.7.": "Asta", "31.7.": "Helena, Elena",
+            "1.8.": "Maire", "2.8.": "Kimmo", "3.8.": "Nea, Linnea", "4.8.": "Veera", "5.8.": "Salme, Sanelma", "6.8.": "Toimi, Keimo", "7.8.": "Lahja", "8.8.": "Sylvi, Silva", "9.8.": "Erja, Eira", "10.8.": "Lauri, Lasse",
+            "11.8.": "Sanna, Susanna", "12.8.": "Klaara", "13.8.": "Jesse", "14.8.": "Onerva, Kanerva", "15.8.": "Marjatta, Marja", "16.8.": "Aulis", "17.8.": "Verneri", "18.8.": "Leevi", "19.8.": "Mauno, Maunu", "20.8.": "Sami, Samuli",
+            "21.8.": "Soini, Veini", "22.8.": "Iivari, Iivo", "23.8.": "Varma, Signe", "24.8.": "Perttu", "25.8.": "Loviisa", "26.8.": "Ilma, Ilmi", "27.8.": "Rauli", "28.8.": "Tauno", "29.8.": "Iines, Iina", "30.8.": "Eemil, Eemeli", "31.8.": "Arvi",
+            "1.9.": "Pirkka", "2.9.": "Sinikka, Sini", "3.9.": "Soila, Soile", "4.9.": "Ansa", "5.9.": "Roni, Mainio", "6.9.": "Asko", "7.9.": "Miro, Arho", "8.9.": "Taimi", "9.9.": "Eevert, Isto", "10.9.": "Kalevi, Kaleva",
+            "11.9.": "Santeri, Aleksanteri", "12.9.": "Valma, Vilja", "13.9.": "Orvo", "14.9.": "Iida", "15.9.": "Sirpa", "16.9.": "Hilla, Hellevi", "17.9.": "Aili, Aila", "18.9.": "Tytti, Tyyne", "19.9.": "Reija", "20.9.": "Varpu, Vaula",
+            "21.9.": "Mervi", "22.9.": "Mauri", "23.9.": "Mielikki, Minja", "24.9.": "Alvar, Auno", "25.9.": "Kullervo", "26.9.": "Kuisma", "27.9.": "Vesa", "28.9.": "Arja", "29.9.": "Mikko, Mika", "30.9.": "Sorja, Sirja",
+            "1.10.": "Rauno, Rainer", "2.10.": "Valio", "3.10.": "Raimo", "4.10.": "Saila, Saija", "5.10.": "Inkeri, Inka", "6.10.": "Minttu, Pinja", "7.10.": "Pirkko, Pirjo", "8.10.": "Hilja", "9.10.": "Ilona", "10.10.": "Aleksi, Aleksis",
+            "11.10.": "Otso, Ohtso", "12.10.": "Aarre, Aarto", "13.10.": "Taina, Tanja", "14.10.": "Elsa, Elsi", "15.10.": "Helvi, Heta", "16.10.": "Sirkka, Sirkku", "17.10.": "Saini, Saana", "18.10.": "Satu, Säde", "19.10.": "Uljas", "20.10.": "Kasperi, Kauno",
+            "21.10.": "Ursula", "22.10.": "Anja", "23.10.": "Severi", "24.10.": "Asmo, Rasmus", "25.10.": "Sointu", "26.10.": "Niina, Amanda", "27.10.": "Helli, Hellin", "28.10.": "Simo", "29.10.": "Alfred, Urmas", "30.10.": "Eila", "31.10.": "Arto, Arttu",
+            "1.11.": "Pyry, Lyly", "2.11.": "Topi, Topias", "3.11.": "Terho", "4.11.": "Hertta", "5.11.": "Reima", "6.11.": "Kustaa Aadolf", "7.11.": "Taisto", "8.11.": "Aatos", "9.11.": "Teuvo", "10.11.": "Martti",
+            "11.11.": "Panu", "12.11.": "Virpi", "13.11.": "Ano, Kristian", "14.11.": "Iiris", "15.11.": "Janika, Janita", "16.11.": "Aarne, Aarno", "17.11.": "Eino, Einari", "18.11.": "Tenho, Jousia", "19.11.": "Liisa, Eliisa", "20.11.": "Jari, Jalmari",
+            "21.11.": "Hilma", "22.11.": "Silja, Selja", "23.11.": "Ismo", "24.11.": "Lempi, Lemmikki", "25.11.": "Katri, Kaisa", "26.11.": "Sisko", "27.11.": "Hilkka", "28.11.": "Heini", "29.11.": "Aimo", "30.11.": "Antti, Antero",
+            "1.12.": "Oskari", "2.12.": "Anelma, Unelma", "3.12.": "Meri, Vellamo", "4.12.": "Airi, Aira", "5.12.": "Selma", "6.12.": "Niilo, Niko", "7.12.": "Sampsa", "8.12.": "Kyllikki, Kylli", "9.12.": "Anna, Anne", "10.12.": "Jutta",
+            "11.12.": "Taneli, Tatu", "12.12.": "Tuovi", "13.12.": "Seija", "14.12.": "Jouko", "15.12.": "Heimo", "16.12.": "Auli, Aulikki", "17.12.": "Raakel", "18.12.": "Aapo, Aappo", "19.12.": "Iiro, Iisakki", "20.12.": "Benjamin, Kerkko",
+            "21.12.": "Tuomas, Tomi", "22.12.": "Raafael", "23.12.": "Senni", "24.12.": "Aatami, Eeva", "25.12.": "", "26.12.": "Tapani, Teppo", "27.12.": "Hannu, Hannes", "28.12.": "Piia", "29.12.": "Rauha", "30.12.": "Daavid, Taavetti", "31.12.": "Silvo, Sylvester"
+        };
+
+        const WEATHER_CODES = {
+            0: "☀️", 1: "🌤️", 2: "☁️", 3: "☁️", 45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
+            61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "🌨️", 80: "🌧️", 81: "🌧️", 82: "⛈️",
+            85: "🌨️", 86: "🌨️", 95: "⛈️", 96: "⛈️", 99: "⛈️"
+        };
+
+        const state = {
+            referenceDate: new Date(),
+            weatherData: {},
+            hourlyForecast: {}, 
+            location: { lat: 60.17, lon: 24.94 }, 
+            locationName: "Helsinki (Oletus)",
+            weeksToShow: 2,
+            showWeather: true,
+            showAstro: true
+        };
+
+        // 2. LOGIIKKA
+        
+        // --- Gaussin algoritmi Pääsiäisen laskemiseen ---
+        function getEasterDate(year) {
+            const a = year % 19;
+            const b = Math.floor(year / 100);
+            const c = year % 100;
+            const d = Math.floor(b / 4);
+            const e = b % 4;
+            const f = Math.floor((b + 8) / 25);
+            const g = Math.floor((b - f + 1) / 3);
+            const h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4);
+            const k = c % 4;
+            const l = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * l) / 451);
+            const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = Maaliskuu, 4 = Huhtikuu
+            const day = ((h + l - 7 * m + 114) % 31) + 1;
+            return new Date(year, month - 1, day);
+        }
+
+        function getMovingHoliday(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth(); 
+            const day = date.getDate();
+            const dayOfWeek = date.getDay(); 
+
+            // 1. Pääsiäisriippuvaiset
+            const easter = getEasterDate(year);
+            const diffTime = date.getTime() - easter.getTime();
+            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays === -2) return "Pitkäperjantai";
+            if (diffDays === 0) return "Pääsiäispäivä";
+            if (diffDays === 1) return "2. pääsiäispäivä";
+            if (diffDays === 39) return "Helatorstai";
+            if (diffDays === 49) return "Helluntai";
+            if (diffDays === -47) return "Laskiainen";
+
+            // 2. Juhannus: Lauantai välillä 20.6.-26.6.
+            if (month === 5 && dayOfWeek === 6 && day >= 20 && day <= 26) return "Juhannuspäivä";
+            if (month === 5 && dayOfWeek === 5 && day >= 19 && day <= 25) return "Juhannusaatto";
+
+            // 3. Pyhäinpäivä: Lauantai välillä 31.10.-6.11.
+            if ((month === 9 && day === 31 && dayOfWeek === 6) || (month === 10 && day <= 6 && dayOfWeek === 6)) {
+                return "Pyhäinpäivä";
+            }
+
+            return null;
+        }
+
+        const SunCalc = {
+            getTimes: function(date, lat, lng) {
+                const start = new Date(date.getFullYear(), 0, 0);
+                const diff = date - start;
+                const oneDay = 1000 * 60 * 60 * 24;
+                const dayOfYear = Math.floor(diff / oneDay);
+                const rad = Math.PI / 180;
+                const deg = 180 / Math.PI;
+                const zenith = 90.833 * rad;
+                const lngHour = lng / 15;
+
+                const calculateTime = (isSunrise) => {
+                    const t = dayOfYear + ((isSunrise ? 6 : 18) - lngHour) / 24;
+                    const M = (0.9856 * t) - 3.289;
+                    let L = M + (1.916 * Math.sin(M * rad)) + (0.020 * Math.sin(2 * M * rad)) + 282.634;
+                    L = (L + 360) % 360;
+                    let RA = deg * Math.atan(0.91764 * Math.tan(L * rad));
+                    RA = (RA + 360) % 360;
+                    const Lquadrant  = (Math.floor( L/90)) * 90;
+                    const RAquadrant = (Math.floor(RA/90)) * 90;
+                    RA = RA + (Lquadrant - RAquadrant);
+                    RA = RA / 15;
+                    const sinDec = 0.39782 * Math.sin(L * rad);
+                    const cosDec = Math.cos(Math.asin(sinDec));
+                    const cosH = (Math.cos(zenith) - (sinDec * Math.sin(lat * rad))) / (cosDec * Math.cos(lat * rad));
+                    if (cosH >  1) return null;
+                    if (cosH < -1) return null;
+                    const H = isSunrise ? 360 - deg * Math.acos(cosH) : deg * Math.acos(cosH);
+                    const H_hours = H / 15;
+                    const T = H_hours + RA - (0.06571 * t) - 6.622;
+                    let UT = T - lngHour;
+                    UT = (UT + 24) % 24;
+                    return UT;
+                };
+
+                const riseUTC = calculateTime(true);
+                const setUTC = calculateTime(false);
+
+                const getLocalStr = (utc) => {
+                    if (utc === null) return "--:--";
+                    const offset = -date.getTimezoneOffset() / 60; 
+                    let local = utc + offset;
+                    local = (local + 24) % 24;
+                    const h = Math.floor(local);
+                    const m = Math.floor((local - h) * 60);
+                    return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+                };
+
+                if (riseUTC === null || setUTC === null) return null;
+
+                return {
+                    sunrise: getLocalStr(riseUTC),
+                    sunset: getLocalStr(setUTC)
+                };
+            }
+        };
+
+        function getMoonPhase(date) {
+            const knownNewMoon = new Date('2025-01-29T12:00:00');
+            const cycle = 29.53059;
+            const diffTime = date.getTime() - knownNewMoon.getTime();
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+            let phaseAge = diffDays % cycle;
+            if (phaseAge < 0) phaseAge += cycle;
+            let icon = '', name = '';
+            if (phaseAge < 1 || phaseAge > 28.5) { icon = '🌑'; name = 'Uusikuu'; }
+            else if (phaseAge < 6.4) { icon = '🌒'; name = 'Kasvava kuppi'; }
+            else if (phaseAge < 8.4) { icon = '🌓'; name = 'Puolikuu (kasvava)'; }
+            else if (phaseAge < 13.8) { icon = '🌔'; name = 'Kasvava kupera'; }
+            else if (phaseAge < 15.8) { icon = '🌕'; name = 'Täysikuu'; }
+            else if (phaseAge < 21.1) { icon = '🌖'; name = 'Vähenevä kupera'; }
+            else if (phaseAge < 23.1) { icon = '🌗'; name = 'Puolikuu (vähenevä)'; }
+            else { icon = '🌘'; name = 'Vähenevä kuppi'; }
+            return { icon, name };
+        }
+
+        function getDynamicSpecialEvent(date) {
+            const month = date.getMonth(); 
+            const day = date.getDate();
+            const dayOfWeek = date.getDay();
+            const year = date.getFullYear();
+
+            // Kiinalainen uusivuosi (hardcoded)
+            if (year === 2025 && month === 0 && day === 29) return { text: "Kiinalainen uusivuosi", type: 'world' };
+            if (year === 2026 && month === 1 && day === 17) return { text: "Kiinalainen uusivuosi", type: 'world' };
+
+            // Astronomiset (Noin-päivämäärät tai tarkat jos tiedossa)
+            // Kevätpäiväntasaus ~ 20.3.
+            if (month === 2 && day === 20) return { text: "Kevätpäiväntasaus", type: 'astro', icon: '🌱' };
+            
+            // Kesäpäivänseisaus ~ 21.6.
+            if (month === 5 && day === 21) return { text: "Kesäpäivänseisaus", type: 'astro', icon: '☀️' };
+
+            // Syyspäiväntasaus
+            if (month === 8) {
+                if (year === 2025 && day === 22) return { text: "Syyspäiväntasaus", type: 'astro', icon: '🍂' };
+                if (year === 2026 && day === 23) return { text: "Syyspäiväntasaus", type: 'astro', icon: '🍂' };
+            }
+
+            // Talvipäivänseisaus ~ 21.12.
+            if (month === 11 && day === 21) return { text: "Talvipäivänseisaus", type: 'astro', icon: '❄️' };
+
+
+            // Kellojen siirto (Kesäaika alkaa: maaliskuun viimeinen sunnuntai)
+            if (month === 2 && dayOfWeek === 0 && day + 7 > 31) {
+                 return { text: "Kesäaika alkaa (kellot +1h)", type: 'time', icon: '🕒' };
+            }
+            // Kellojen siirto (Talviaika alkaa: lokakuun viimeinen sunnuntai)
+            if (month === 9 && dayOfWeek === 0 && day + 7 > 31) {
+                 return { text: "Talviaika alkaa (kellot -1h)", type: 'time', icon: '🕒' };
+            }
+
+            // Äitienpäivä
+            if (month === 4 && dayOfWeek === 0) {
+                if (day > 7 && day <= 14) return { text: "Äitienpäivä", type: 'flag' };
+            }
+            // Isänpäivä
+            if (month === 10 && dayOfWeek === 0) {
+                if (day > 7 && day <= 14) return { text: "Isänpäivä", type: 'flag' };
+            }
+            
+            // Thanksgiving
+            if (month === 10 && dayOfWeek === 4) {
+                 if (day >= 22 && day <= 28) return { text: "Thanksgiving (USA)", type: 'world' };
+            }
+            // Black Friday
+            if (month === 10 && dayOfWeek === 5) {
+                 if (day >= 23 && day <= 29) return { text: "Black Friday", type: 'world' };
+            }
+
+            return null;
+        }
+
+        function getMonday(d) {
+            d = new Date(d);
+            var day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6 : 1); 
+            d.setDate(diff); d.setHours(0,0,0,0); return d;
+        }
+
+        Date.prototype.getISOWeek = function() {
+            var date = new Date(this.getTime()); date.setHours(0, 0, 0, 0);
+            date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+            var week1 = new Date(date.getFullYear(), 0, 4);
+            return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+        }
+        Date.prototype.getISOYear = function() {
+            var date = new Date(this.getTime()); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+            return date.getFullYear();
+        }
+
+        function formatDateISO(date) {
+            const offset = date.getTimezoneOffset();
+            const d = new Date(date.getTime() - (offset*60*1000));
+            return d.toISOString().split('T')[0];
+        }
+
+        function formatDateFI(date) {
+            const day = date.getDate().toString().padStart(2, '0');
+            const month = (date.getMonth() + 1).toString().padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}.${month}.${year}`;
+        }
+
+        async function fetchWeather() {
+            const statusEl = document.getElementById('weather-status');
+            statusEl.textContent = "Päivitetään...";
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${state.location.lat}&longitude=${state.location.lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,wind_speed_10m_max,wind_direction_10m_dominant&hourly=temperature_2m,weathercode,precipitation,wind_speed_10m&wind_speed_unit=ms&timezone=auto&forecast_days=16&past_days=92`;
+
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Verkkovirhe");
+                const data = await response.json();
+                
+                state.hourlyForecast = data.hourly || {};
+
+                if (data.daily && data.daily.time) {
+                    data.daily.time.forEach((dateStr, index) => {
+                        const riseFull = data.daily.sunrise[index];
+                        const setFull = data.daily.sunset[index];
+                        const riseTime = riseFull ? riseFull.split('T')[1] : null;
+                        const setTime = setFull ? setFull.split('T')[1] : null;
+
+                        const maxTemp = data.daily.temperature_2m_max[index];
+                        const minTemp = data.daily.temperature_2m_min[index];
+                        const windSpd = data.daily.wind_speed_10m_max[index];
+                        const precipVal = data.daily.precipitation_sum[index];
+
+                        state.weatherData[dateStr] = {
+                            code: data.daily.weathercode[index],
+                            max: maxTemp !== null ? Math.round(maxTemp) : null,
+                            min: minTemp !== null ? Math.round(minTemp) : null,
+                            sunrise: riseTime,
+                            sunset: setTime,
+                            precip: precipVal !== null ? precipVal : null,
+                            windSpeed: windSpd !== null ? Math.round(windSpd) : null,
+                            windDir: data.daily.wind_direction_10m_dominant[index]
+                        };
+                    });
+                    renderCalendar();
+                    statusEl.innerHTML = `Säädata: ${state.locationName} <span class="mx-1 text-gray-300">|</span> Lähde: <a href="https://open-meteo.com" target="_blank" class="hover:text-gray-600 hover:underline">Open-Meteo</a>`;
+                }
+            } catch (error) {
+                console.error(error);
+                statusEl.textContent = "Säädataa ei saatavilla";
+            }
+        }
+
+        let clockInterval = null;
+
+        function startClock() {
+            if (clockInterval) clearInterval(clockInterval);
+            
+            const update = () => {
+                const el = document.getElementById('live-clock');
+                if (el) {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('en-GB'); 
+                    const day = now.getDate().toString().padStart(2, '0');
+                    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+                    const year = now.getFullYear();
+                    const dateStr = `${day}.${month}.${year}`;
+                    
+                    el.innerHTML = `${dateStr}<br>${timeStr}`;
+                }
+            };
+            
+            update();
+            clockInterval = setInterval(update, 1000);
+        }
+
+        function openDayModal(date, sunInfo, nameDay, weather, specialEvent) {
+            const dateStr = formatDateISO(date);
+            const modal = document.getElementById('day-modal');
+            const title = document.getElementById('modal-date-title');
+            const subtitle = document.getElementById('modal-subtitle');
+            const sunContainer = document.getElementById('modal-sun-info');
+            const nameContainer = document.getElementById('modal-namedays');
+            const hourlyContainer = document.getElementById('modal-hourly-forecast');
+            const specialBox = document.getElementById('modal-special-event-box');
+
+            const dayNames = ["Sunnuntai", "Maanantai", "Tiistai", "Keskiviikko", "Torstai", "Perjantai", "Lauantai"];
+            title.textContent = `${dayNames[date.getDay()]} ${formatDateFI(date)}`;
+            
+            // Kiinteä + liikkuva
+            let holiday = HOLIDAYS[dateStr]; // Ensin tarkista kiinteät/nykyiset
+            if (!holiday) holiday = getMovingHoliday(date); // Sitten liikkuvat
+            
+            if (holiday) {
+                const flagHolidays = ["Itsenäisyyspäivä", "Vappu", "Juhannuspäivä"];
+                const flagPrefix = flagHolidays.includes(holiday) ? getFlagSvg("w-4 h-3 mr-1") : "";
+                
+                subtitle.innerHTML = `${flagPrefix}${holiday}`;
+                subtitle.className = "text-sm text-red-600 font-bold flex items-center";
+                subtitle.style.display = "flex";
+            } else {
+                subtitle.textContent = "";
+                subtitle.style.display = "none";
+            }
+
+            if (specialEvent) {
+                specialBox.classList.remove('hidden');
+                let iconHtml = '';
+                if (specialEvent.icon) {
+                     iconHtml = `<span class="text-xs mr-1">${specialEvent.icon}</span>`;
+                } else {
+                     const iconChar = specialEvent.type === 'flag' ? getFlagSvg("w-6 h-4") : '🌍';
+                     iconHtml = `<span class="text-2xl flex items-center mr-1">${iconChar}</span>`;
+                }
+                
+                specialBox.innerHTML = `
+                    <div class="flex items-center">${iconHtml}</div>
+                    <div>
+                        <div class="text-sm text-yellow-900 font-medium">${specialEvent.text}</div>
+                    </div>
+                `;
+            } else {
+                specialBox.classList.add('hidden');
+            }
+
+            sunContainer.innerHTML = sunInfo.sunrise !== "--:--" 
+                ? `<div><span class="text-2xl">🌅</span> ${sunInfo.sunrise}</div><div><span class="text-2xl">🌇</span> ${sunInfo.sunset}</div>`
+                : "Ei tietoa";
+            
+            nameContainer.textContent = nameDay || "Ei nimipäiviä";
+
+            hourlyContainer.innerHTML = ''; 
+            
+            const weatherTitle = document.getElementById('modal-weather-title');
+            const now = new Date();
+            now.setHours(0,0,0,0);
+            
+            if (date.getTime() < now.getTime()) {
+                weatherTitle.innerHTML = '<span>🕒</span> Tuntikohtainen säähistoria';
+            } else {
+                weatherTitle.innerHTML = '<span>🕒</span> Tuntikohtainen sääennuste';
+            }
+
+            if (state.hourlyForecast && state.hourlyForecast.time) {
+                const startIdx = state.hourlyForecast.time.findIndex(t => t.startsWith(dateStr));
+                
+                if (startIdx !== -1) {
+                    for (let i = 0; i < 24; i++) {
+                        const idx = startIdx + i;
+                        if (!state.hourlyForecast.time[idx]) break;
+
+                        const timeRaw = state.hourlyForecast.time[idx]; 
+                        const hour = timeRaw.split('T')[1];
+                        const temp = Math.round(state.hourlyForecast.temperature_2m[idx]);
+                        const code = state.hourlyForecast.weathercode[idx];
+                        const rain = state.hourlyForecast.precipitation[idx];
+                        const wind = Math.round(state.hourlyForecast.wind_speed_10m[idx]);
+                        const icon = WEATHER_CODES[code] || "❓";
+
+                        const row = document.createElement('div');
+                        row.className = "grid grid-cols-[3rem_1fr_1fr_1fr_1fr] gap-2 items-center py-2 border-b border-gray-100 hover:bg-gray-50 text-sm";
+                        row.innerHTML = `
+                            <div class="font-mono font-bold w-12">${hour}</div>
+                            <div class="text-xl text-center">${icon}</div>
+                            <div class="text-center font-bold ${temp > 0 ? 'text-gray-800' : 'text-blue-600'}">${temp}°</div>
+                            <div class="text-center text-gray-500 text-xs">${rain > 0 ? rain + ' mm' : '-'}</div>
+                            <div class="text-center text-gray-500 text-xs">${wind} m/s</div>
+                        `;
+                        hourlyContainer.appendChild(row);
+                    }
+                } else {
+                    hourlyContainer.innerHTML = '<div class="text-center py-4 text-gray-400">Tuntikohtaista säädataa ei saatavilla tälle päivälle.</div>';
+                }
+            } else {
+                hourlyContainer.innerHTML = '<div class="text-center py-4 text-gray-400">Säädataa ladataan...</div>';
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        document.getElementById('close-modal').addEventListener('click', () => {
+            document.getElementById('day-modal').classList.add('hidden');
+        });
+        
+        document.getElementById('day-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'day-modal') {
+                e.target.classList.add('hidden');
+            }
+        });
+
+        // Kytkimet
+        const astroBtn = document.getElementById('astro-toggle-btn');
+        const weatherBtn = document.getElementById('weather-toggle-btn');
+
+        function updateAstroBtnUI() {
+            if (state.showAstro) {
+                astroBtn.className = "w-8 h-8 rounded-full bg-blue-50 border border-blue-200 text-lg flex items-center justify-center hover:bg-blue-100 transition-colors shadow-sm text-blue-600";
+                astroBtn.innerHTML = "🌘";
+                astroBtn.title = "Piilota kuun vaiheet ja aurinko";
+            } else {
+                astroBtn.className = "w-8 h-8 rounded-full bg-gray-100 border border-gray-300 text-lg flex items-center justify-center hover:bg-gray-200 transition-colors opacity-60 grayscale";
+                astroBtn.innerHTML = "🌘";
+                astroBtn.title = "Näytä kuun vaiheet ja aurinko";
+            }
+        }
+
+        function updateWeatherBtnUI() {
+            if (state.showWeather) {
+                weatherBtn.className = "w-8 h-8 rounded-full bg-blue-50 border border-blue-200 text-lg flex items-center justify-center hover:bg-blue-100 transition-colors shadow-sm text-blue-600";
+                weatherBtn.innerHTML = "🌤️";
+                weatherBtn.title = "Piilota sää";
+            } else {
+                weatherBtn.className = "w-8 h-8 rounded-full bg-gray-100 border border-gray-300 text-lg flex items-center justify-center hover:bg-gray-200 transition-colors opacity-60 grayscale";
+                weatherBtn.innerHTML = "🌤️";
+                weatherBtn.title = "Näytä sää";
+            }
+        }
+
+        astroBtn.addEventListener('click', () => {
+            state.showAstro = !state.showAstro;
+            updateAstroBtnUI();
+            renderCalendar();
+        });
+
+        weatherBtn.addEventListener('click', () => {
+            state.showWeather = !state.showWeather;
+            updateWeatherBtnUI();
+            renderCalendar();
+        });
+
+        const locModal = document.getElementById('location-modal');
+        const openLocBtn = document.getElementById('open-location-modal');
+        const closeLocBtn = document.getElementById('cancel-location');
+        const saveLocBtn = document.getElementById('save-location');
+        const citySelect = document.getElementById('city-select');
+        const latInput = document.getElementById('lat-input');
+        const lonInput = document.getElementById('lon-input');
+        const gpsBtn = document.getElementById('use-gps');
+
+        openLocBtn.addEventListener('click', () => {
+            locModal.classList.remove('hidden');
+        });
+
+        closeLocBtn.addEventListener('click', () => {
+            locModal.classList.add('hidden');
+        });
+
+        citySelect.addEventListener('change', (e) => {
+            if (e.target.value !== 'custom') {
+                const [lat, lon] = e.target.value.split(',');
+                latInput.value = lat;
+                lonInput.value = lon;
+            }
+        });
+
+        saveLocBtn.addEventListener('click', () => {
+            const lat = parseFloat(latInput.value);
+            const lon = parseFloat(lonInput.value);
+            
+            if (isNaN(lat) || isNaN(lon)) {
+                alert("Virheelliset koordinaatit");
+                return;
+            }
+
+            state.location = { lat, lon };
+            const selectedOpt = citySelect.options[citySelect.selectedIndex];
+            if (selectedOpt.value !== 'custom') {
+                state.locationName = selectedOpt.text;
+            } else {
+                state.locationName = `Lat: ${lat}, Lon: ${lon}`;
+            }
+
+            fetchWeather();
+            locModal.classList.add('hidden');
+        });
+
+        gpsBtn.addEventListener('click', () => {
+            if ("geolocation" in navigator) {
+                gpsBtn.textContent = "Haetaan...";
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude.toFixed(2);
+                        const lon = position.coords.longitude.toFixed(2);
+                        latInput.value = lat;
+                        lonInput.value = lon;
+                        citySelect.value = 'custom';
+                        gpsBtn.textContent = "📍 Sijainti haettu!";
+                        setTimeout(() => { gpsBtn.innerHTML = "<span>📍</span> Hae sijaintini (GPS)"; }, 2000);
+                    },
+                    (error) => {
+                        alert("Sijainnin haku epäonnistui: " + error.message);
+                        gpsBtn.innerHTML = "<span>📍</span> Hae sijaintini (GPS)";
+                    }
+                );
+            } else {
+                alert("Selaimesi ei tue paikannusta.");
+            }
+        });
+
+        function renderCalendar() {
+            if (clockInterval) clearInterval(clockInterval);
+
+            const container = document.getElementById('calendar-grid');
+            container.innerHTML = ''; 
+
+            const today = new Date(); today.setHours(0,0,0,0);
+            const todayStr = formatDateISO(today);
+            let loopDate = getMonday(state.referenceDate);
+
+            let hasTodayInView = false;
+
+            const showNamedays = state.weeksToShow <= 2;
+
+            for (let weekIndex = 0; weekIndex < state.weeksToShow; weekIndex++) {
+                const weekNum = loopDate.getISOWeek();
+                const yearNum = loopDate.getISOYear();
+                
+                const currentMonthIndex = loopDate.getMonth();
+                const sundayDate = new Date(loopDate);
+                sundayDate.setDate(loopDate.getDate() + 6);
+                const nextMonthIndex = sundayDate.getMonth();
+                
+                const MONTH_NAMES = ["TAMMI", "HELMI", "MAALIS", "HUHTI", "TOUKO", "KESÄ", "HEINÄ", "ELO", "SYYS", "LOKA", "MARRAS", "JOULU"];
+                let monthStr = MONTH_NAMES[currentMonthIndex];
+                
+                if (currentMonthIndex !== nextMonthIndex) {
+                    monthStr = `${MONTH_NAMES[currentMonthIndex]} - ${MONTH_NAMES[nextMonthIndex]}`;
+                }
+
+                const weekCell = document.createElement('div');
+                weekCell.className = "flex flex-col justify-center items-center bg-gray-50 border-b border-r border-gray-200 p-2 text-gray-500 font-mono text-sm";
+                weekCell.innerHTML = `
+                    <span class="text-xl font-bold">${weekNum}</span>
+                    <span class="text-[10px] uppercase font-bold text-gray-400 mt-1 text-center leading-tight">${monthStr}</span>
+                    <span class="text-[10px] text-gray-300 mt-1">${yearNum}</span>
+                `;
+                container.appendChild(weekCell);
+
+                for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+                    const dateStr = formatDateISO(loopDate);
+                    const fiDateStr = formatDateFI(loopDate); 
+                    const lookupDateStr = loopDate.getDate() + '.' + (loopDate.getMonth() + 1) + '.'; 
+
+                    const isWeekend = dayIndex >= 5;
+                    
+                    // PYHÄPÄIVÄT: Kiinteä tai liikkuva
+                    let holidayName = HOLIDAYS[dateStr];
+                    if (!holidayName) holidayName = getMovingHoliday(loopDate);
+                    
+                    let specialEvent = SPECIAL_EVENTS_DB[lookupDateStr];
+                    if (!specialEvent) specialEvent = getDynamicSpecialEvent(loopDate);
+                    
+                    const nameDay = NAMEDAYS[lookupDateStr] || ""; 
+                    const moon = getMoonPhase(loopDate);
+
+                    const isToday = dateStr === todayStr;
+                    if (isToday) hasTodayInView = true;
+
+                    const weather = state.weatherData[dateStr];
+                    
+                    const diffTime = Math.abs(loopDate - today);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                    const isForecastUncertain = loopDate > today && diffDays > 7;
+                    const weatherOpacityClass = isForecastUncertain ? "opacity-50 grayscale hover:grayscale-0 hover:opacity-100 transition-all" : "";
+                    const uncertaintyIcon = isForecastUncertain ? "<span class='text-[10px] ml-1'>⚠️</span>" : "";
+
+                    let sunInfo = { sunrise: "--:--", sunset: "--:--" };
+                    
+                    if (weather && weather.sunrise) {
+                        sunInfo.sunrise = weather.sunrise;
+                        sunInfo.sunset = weather.sunset;
+                    } else {
+                        const calculatedSun = SunCalc.getTimes(loopDate, state.location.lat, state.location.lon);
+                        if (calculatedSun) {
+                            sunInfo = calculatedSun;
+                        }
+                    }
+
+                    const cell = document.createElement('div');
+                    let bgClass = "bg-white";
+                    if (isToday) bgClass = "bg-today";
+                    else if (holidayName) bgClass = "bg-holiday";
+                    else if (isWeekend) bgClass = "bg-weekend";
+
+                    const minHeight = state.weeksToShow > 3 ? "min-h-[140px]" : "min-h-[220px]";
+                    cell.className = `${bgClass} border-b border-r border-gray-200 p-2 ${minHeight} flex flex-col relative transition-colors hover:bg-gray-50 overflow-hidden cursor-pointer`;
+                    
+                    const currentCellDate = new Date(loopDate.getTime());
+                    const currentSunInfo = {...sunInfo}; 
+                    const currentNameDay = nameDay;
+                    const currentWeather = weather ? {...weather} : null;
+                    const currentSpecialEvent = specialEvent ? {...specialEvent} : null;
+
+                    cell.addEventListener('click', () => {
+                        openDayModal(currentCellDate, currentSunInfo, currentNameDay, currentWeather, currentSpecialEvent);
+                    });
+
+                    const headerClass = holidayName || dayIndex === 6 ? "text-red-600" : "text-gray-700";
+                    
+                    let rightContent = "";
+                    if (isToday) {
+                        rightContent = `<span id="live-clock" class="text-[10px] text-gray-400 font-mono leading-none text-right"></span>`;
+                    } else {
+                        rightContent = `<span class="text-[10px] text-gray-400 font-mono leading-none">${fiDateStr}</span>`;
+                    }
+
+                    let htmlContent = `
+                        <div class="flex justify-between items-start pointer-events-none">
+                            <div class="flex items-baseline">
+                                <span class="${headerClass} font-bold text-2xl leading-none">${loopDate.getDate()}.</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                ${rightContent}
+                            </div>
+                        </div>
+                    `;
+
+                    if (holidayName) {
+                        const flagHolidays = ["Itsenäisyyspäivä", "Vappu", "Juhannuspäivä"];
+                        const flagPrefix = flagHolidays.includes(holidayName) ? getFlagSvg("w-3.5 h-2.5 mr-1") : "";
+                        
+                        htmlContent += `<div class="text-[11px] text-red-600 font-bold mt-1 uppercase tracking-tight leading-tight pointer-events-none flex items-center">${flagPrefix}${holidayName}</div>`;
+                    }
+                    
+                    if (nameDay && showNamedays) {
+                         htmlContent += `<div class="text-[10px] text-gray-400 mt-0.5 leading-tight overflow-hidden text-ellipsis whitespace-nowrap pointer-events-none">${nameDay}</div>`;
+                    }
+
+                    if (specialEvent) {
+                        const icon = specialEvent.type === 'flag' ? getFlagSvg("w-3 h-2") : '🌍';
+                        htmlContent += `
+                            <div class="mt-2 mb-1 bg-event-box border border-yellow-200 rounded p-1 text-[10px] text-event-text font-medium leading-tight flex items-start gap-1 shadow-sm pointer-events-none">
+                                <span class="flex-shrink-0 text-sm flex items-center">${icon}</span>
+                                <span>${specialEvent.text}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    htmlContent += `<div class="mt-auto flex flex-col gap-1 pointer-events-none">`;
+
+                    const hasWeatherData = weather && weather.max !== null && weather.code !== null;
+
+                    if (state.showWeather && hasWeatherData) {
+                        const icon = WEATHER_CODES[weather.code] || "❓";
+                        const precipText = weather.precip !== null ? `${weather.precip}mm` : "-";
+                        const windText = weather.windSpeed !== null ? `${weather.windSpeed} m/s` : "-";
+                        
+                        htmlContent += `
+                            <div class="bg-white/60 rounded p-1 border border-gray-100 ${weatherOpacityClass} flex flex-col gap-1">
+                                <div class="flex items-center justify-between">
+                                    <div class="text-xl" title="Sääkoodi: ${weather.code}">${icon}</div>
+                                    <div class="text-right text-xs leading-none">
+                                        <span class="font-bold text-gray-800">${weather.max}°</span>
+                                        <span class="text-[10px] text-gray-500"> / ${weather.min}°</span>
+                                    </div>
+                                    ${uncertaintyIcon}
+                                </div>
+                                <div class="flex justify-between items-center text-[9px] text-gray-600">
+                                    <div class="flex items-center" title="Sademäärä">
+                                        <span>💧 ${precipText}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1" title="Tuulen suunta ja nopeus">
+                                        <span style="transform: rotate(${weather.windDir || 0}deg); display: inline-block;" class="text-lg font-black text-gray-700">↓</span>
+                                        <span>${windText}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (state.showWeather) {
+                        const isPast = loopDate < today;
+                        const noDataText = isPast ? "Ei säädataa" : "-";
+                        htmlContent += `<div class="text-[10px] text-gray-300 text-center py-2">${noDataText}</div>`;
+                    }
+
+                    if (state.showAstro) {
+                        htmlContent += `
+                            <div class="flex flex-col gap-0.5 px-1 pb-1">
+                                <div class="flex items-center justify-between text-[10px] text-gray-400">
+                                    <span class="flex items-center gap-1" title="${moon.name}">${moon.icon} ${moon.name}</span>
+                                </div>
+                        `;
+                        
+                        if (sunInfo.sunrise !== "--:--") {
+                            htmlContent += `
+                                <div class="flex items-center justify-between text-[10px] text-gray-400">
+                                    <span class="flex items-center gap-1" title="Auringonnousu">🌅 ${sunInfo.sunrise}</span>
+                                    <span class="flex items-center gap-1" title="Auringonlasku">🌇 ${sunInfo.sunset}</span>
+                                </div>
+                            `;
+                        }
+                        
+                        htmlContent += `</div>`; 
+                    }
+                    
+                    htmlContent += `</div>`; 
+
+                    cell.innerHTML = htmlContent;
+                    container.appendChild(cell);
+                    loopDate.setDate(loopDate.getDate() + 1);
+                }
+            }
+
+            if (hasTodayInView) {
+                startClock();
+            }
+        }
+
+        function moveView(weeks) {
+            state.referenceDate.setDate(state.referenceDate.getDate() + (weeks * 7));
+            renderCalendar();
+        }
+
+        document.getElementById('btn-prev').addEventListener('click', () => moveView(-1));
+        document.getElementById('btn-next').addEventListener('click', () => moveView(1));
+        document.getElementById('btn-today').addEventListener('click', () => {
+            state.referenceDate = new Date();
+            renderCalendar();
+        });
+
+        const appContainer = document.getElementById('app');
+        let scrollBlock = false;
+        appContainer.addEventListener('wheel', (e) => {
+            const modal = document.getElementById('day-modal');
+            if (!modal.classList.contains('hidden')) {
+                return; 
+            }
+
+            e.preventDefault();
+            if (scrollBlock) return;
+            if (Math.abs(e.deltaY) < 10) return;
+            if (e.deltaY > 0) moveView(1);
+            else moveView(-1);
+            scrollBlock = true;
+            setTimeout(() => { scrollBlock = false; }, 100);
+        }, { passive: false });
+
+        const resizeHandle = document.getElementById('resize-handle');
+        let isResizing = false;
+        let startY = 0;
+
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startY = e.clientY;
+            document.body.classList.add('noselect'); 
+            document.body.style.cursor = 'ns-resize';
+        });
+
+        resizeHandle.addEventListener('touchstart', (e) => {
+            isResizing = true;
+            startY = e.touches[0].clientY;
+            e.preventDefault(); 
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            handleDrag(e.clientY);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isResizing) return;
+            handleDrag(e.touches[0].clientY);
+        });
+
+        window.addEventListener('mouseup', stopResize);
+        window.addEventListener('touchend', stopResize);
+
+        function handleDrag(currentY) {
+            const diff = currentY - startY;
+            const threshold = 50; 
+
+            if (diff > threshold) {
+                if (state.weeksToShow < 6) {
+                    state.weeksToShow++;
+                    renderCalendar();
+                    startY = currentY; 
+                }
+            } else if (diff < -threshold) {
+                if (state.weeksToShow > 1) {
+                    state.weeksToShow--;
+                    renderCalendar();
+                    startY = currentY; 
+                }
+            }
+        }
+
+        function stopResize() {
+            isResizing = false;
+            document.body.classList.remove('noselect');
+            document.body.style.cursor = '';
+        }
+
+        (function init() {
+            state.referenceDate = new Date();
+            updateWeatherBtnUI(); 
+            updateAstroBtnUI(); 
+            renderCalendar(); 
+
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        state.location = {
+                            lat: position.coords.latitude,
+                            lon: position.coords.longitude
+                        };
+                        state.locationName = "Paikannettu";
+                        fetchWeather(); 
+                    },
+                    (error) => {
+                        console.log("Sijaintia ei saatu, käytetään oletusta (Helsinki). Virhe:", error.message);
+                        fetchWeather(); 
+                    }
+                );
+            } else {
+                fetchWeather(); 
+            }
+        })();
+
+    </script>
+</body>
+</html>
