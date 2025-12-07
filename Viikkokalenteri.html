@@ -34,7 +34,13 @@
         /* Määritellään kustomoitu grid: VKO on puolet muiden sarakkeiden leveydestä */
         .custom-grid {
             display: grid;
-            grid-template-columns: 0.5fr repeat(7, 1fr);
+            grid-template-columns: 1fr; /* Mobile first: pino */
+        }
+
+        @media (min-width: 768px) {
+            .custom-grid {
+                grid-template-columns: 0.5fr repeat(7, 1fr);
+            }
         }
 
         @media print {
@@ -60,6 +66,14 @@
             }
             /* Piilota modaali tulosteessa */
             #day-modal, #location-modal {
+                display: none !important;
+            }
+            /* Näytä header tulosteessa */
+            .print-header-visible {
+                display: grid !important;
+            }
+            /* Piilota mobiiliotsikot tulosteessa */
+            .print-hidden {
                 display: none !important;
             }
         }
@@ -121,8 +135,8 @@
 
         <!-- Kalenteri -->
         <div class="overflow-x-auto scrolling-wrapper flex-grow">
-            <!-- Grid Header -->
-            <div class="custom-grid bg-calendar-header border-b border-gray-200 min-w-[900px]">
+            <!-- Grid Header: Piilotetaan mobiilissa (hidden), näytetään työpöydällä (md:grid) ja tulosteessa -->
+            <div class="custom-grid bg-calendar-header border-b border-gray-200 w-full md:min-w-[900px] hidden md:grid print-header-visible">
                 <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">VKO</div>
                 <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">Maanantai</div>
                 <div class="p-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-center border-r border-gray-200">Tiistai</div>
@@ -134,7 +148,7 @@
             </div>
 
             <!-- Dynaaminen sisältö -->
-            <div id="calendar-grid" class="custom-grid min-w-[900px]">
+            <div id="calendar-grid" class="custom-grid w-full md:min-w-[900px]">
                 <!-- Javascript täyttää solut -->
             </div>
         </div>
@@ -303,7 +317,7 @@
         };
 
         const SPECIAL_EVENTS_DB = {
-            "3.2.": { text: "Alvar ja Aino Aallon päivä", type: 'flag' }, // UUSI
+            "3.2.": { text: "Alvar ja Aino Aallon päivä", type: 'flag' }, 
             "5.2.": { text: "J.L. Runebergin päivä", type: 'flag' }, 
             "6.2.": { text: "Saamelaisten kansallispäivä", type: 'flag' },
             "14.2.": { text: "Ystävänpäivä", type: 'world' }, "28.2.": { text: "Kalevalan päivä", type: 'flag' },
@@ -313,13 +327,13 @@
             "27.4.": { text: "Kansallinen veteraanipäivä", type: 'flag' }, "9.5.": { text: "Eurooppa-päivä", type: 'flag' },
             "12.5.": { text: "J.V. Snellmanin päivä", type: 'flag' }, "4.6.": { text: "Puolustusvoimain lippujuhla", type: 'flag' },
             "6.7.": { text: "Eino Leinon päivä", type: 'flag' }, 
-            "9.8.": { text: "Tove Janssonin päivä", type: 'flag' }, // UUSI
-            "1.10.": { text: "Miina Sillanpään päivä", type: 'flag' }, // UUSI
+            "9.8.": { text: "Tove Janssonin päivä", type: 'flag' }, 
+            "1.10.": { text: "Miina Sillanpään päivä", type: 'flag' }, 
             "10.10.": { text: "Aleksis Kiven päivä", type: 'flag' },
             "24.10.": { text: "YK:n päivä", type: 'flag' }, "31.10.": { text: "Halloween", type: 'world' },
             "6.11.": { text: "Ruotsalaisuuden päivä", type: 'flag' },
             "20.11.": { text: "Lapsen oikeuksien päivä", type: 'flag' }, "8.12.": { text: "Jean Sibeliuksen päivä", type: 'flag' },
-            "13.12.": { text: "Lucian päivä", type: 'world' } // UUSI
+            "13.12.": { text: "Lucian päivä", type: 'world' } 
         };
 
         const NAMEDAYS = {
@@ -399,6 +413,7 @@
             return new Date(year, month - 1, day);
         }
 
+        // UUSI: Liikkuvien pyhien laskenta
         function getMovingHoliday(date) {
             const year = date.getFullYear();
             const month = date.getMonth(); 
@@ -407,7 +422,11 @@
 
             // 1. Pääsiäisriippuvaiset
             const easter = getEasterDate(year);
-            const diffTime = date.getTime() - easter.getTime();
+            // Nollataan tunnit vertailun helpottamiseksi
+            const checkDate = new Date(year, month, day);
+            const easterDate = new Date(easter.getFullYear(), easter.getMonth(), easter.getDate());
+            
+            const diffTime = checkDate.getTime() - easterDate.getTime();
             const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
             if (diffDays === -2) return "Pitkäperjantai";
@@ -511,7 +530,7 @@
             const dayOfWeek = date.getDay();
             const year = date.getFullYear();
 
-            // Kiinalainen uusivuosi (hardcoded)
+            // Kiinteät päivämäärät mutta vaihtuvilla vuosilla (kuten Kiinalainen uusivuosi)
             if (year === 2025 && month === 0 && day === 29) return { text: "Kiinalainen uusivuosi", type: 'world' };
             if (year === 2026 && month === 1 && day === 17) return { text: "Kiinalainen uusivuosi", type: 'world' };
 
@@ -673,8 +692,8 @@
             title.textContent = `${dayNames[date.getDay()]} ${formatDateFI(date)}`;
             
             // Kiinteä + liikkuva
-            let holiday = HOLIDAYS[dateStr]; // Ensin tarkista kiinteät/nykyiset
-            if (!holiday) holiday = getMovingHoliday(date); // Sitten liikkuvat
+            let holiday = HOLIDAYS[dateStr];
+            if (!holiday) holiday = getMovingHoliday(date);
             
             if (holiday) {
                 const flagHolidays = ["Itsenäisyyspäivä", "Vappu", "Juhannuspäivä"];
@@ -773,9 +792,8 @@
             }
         });
 
-        // Kytkimet
-        const astroBtn = document.getElementById('astro-toggle-btn');
         const weatherBtn = document.getElementById('weather-toggle-btn');
+        const astroBtn = document.getElementById('astro-toggle-btn');
 
         function updateAstroBtnUI() {
             if (state.showAstro) {
@@ -892,6 +910,9 @@
             const todayStr = formatDateISO(today);
             let loopDate = getMonday(state.referenceDate);
 
+            // Varmuuden vuoksi, jos on kadonnut
+            const WEEKDAYS = ['Maanantai', 'Tiistai', 'Keskiviikko', 'Torstai', 'Perjantai', 'Lauantai', 'Sunnuntai'];
+
             let hasTodayInView = false;
 
             const showNamedays = state.weeksToShow <= 2;
@@ -928,7 +949,6 @@
 
                     const isWeekend = dayIndex >= 5;
                     
-                    // PYHÄPÄIVÄT: Kiinteä tai liikkuva
                     let holidayName = HOLIDAYS[dateStr];
                     if (!holidayName) holidayName = getMovingHoliday(loopDate);
                     
@@ -989,7 +1009,10 @@
                         rightContent = `<span class="text-[10px] text-gray-400 font-mono leading-none">${fiDateStr}</span>`;
                     }
 
+                    const dayName = WEEKDAYS[dayIndex];
+
                     let htmlContent = `
+                        <div class="md:hidden text-xs font-bold text-gray-400 uppercase mb-1">${dayName}</div>
                         <div class="flex justify-between items-start pointer-events-none">
                             <div class="flex items-baseline">
                                 <span class="${headerClass} font-bold text-2xl leading-none">${loopDate.getDate()}.</span>
@@ -1105,6 +1128,8 @@
         const appContainer = document.getElementById('app');
         let scrollBlock = false;
         appContainer.addEventListener('wheel', (e) => {
+            if (window.innerWidth < 768) return;
+
             const modal = document.getElementById('day-modal');
             if (!modal.classList.contains('hidden')) {
                 return; 
