@@ -13,6 +13,7 @@ This repository contains various small code trials and experiments. It serves as
 - [Image to HTML Generator](https://kavierim.github.io/temp/Image2HTML.html): Convert an image into an HTML page using a local model. Runs 100% in your browser.
 - [Text to Speech](https://kavierim.github.io/temp/TextToSpeech.html): Generate speech from text directly in your browser using Transformers.js.
 - [Viikkokalenteri](https://kavierim.github.io/temp/Viikkokalenteri.html): A Finnish weekly calendar with name days, holidays, and weather information.
+- [PDF Converter](https://kavierim.github.io/temp/PDFConverter.html): Local PDF to Markdown/LaTeX converter (client-side, no uploads).
 
 ## How to Use
 
@@ -33,6 +34,7 @@ For example:
 - https://kavierim.github.io/temp/Image2HTML.html
 - https://kavierim.github.io/temp/TextToSpeech.html
 - https://kavierim.github.io/temp/Viikkokalenteri.html
+- https://kavierim.github.io/temp/PDFConverter.html
 
 ## Contributing
 
