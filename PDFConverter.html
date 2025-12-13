@@ -3,18 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local PDF to Markdown/LaTeX Converter</title>
+    <title>PDF to Markdown (Live Review)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load PDF.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Load Marked.js for Markdown Preview -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Custom scrollbar for the output area */
+        /* Custom scrollbar */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .drag-active { border-color: #3b82f6; background-color: #eff6ff; }
+
+        /* Markdown Preview Styles (Tailwind resets these, so we need to restore them for the preview) */
+        .markdown-preview { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: #374151; line-height: 1.6; }
+        .markdown-preview h1 { font-size: 1.75em; font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.2em; }
+        .markdown-preview h2 { font-size: 1.5em; font-weight: 600; margin-top: 1em; margin-bottom: 0.5em; color: #1f2937; }
+        .markdown-preview h3 { font-size: 1.25em; font-weight: 600; margin-top: 1em; margin-bottom: 0.5em; color: #374151; }
+        .markdown-preview p { margin-bottom: 1em; }
+        .markdown-preview ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+        .markdown-preview ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 1em; }
+        .markdown-preview li { margin-bottom: 0.25em; }
+        .markdown-preview blockquote { border-left: 4px solid #e5e7eb; padding-left: 1em; font-style: italic; color: #6b7280; margin-bottom: 1em; }
+        .markdown-preview code { background-color: #f3f4f6; padding: 0.2em 0.4em; border-radius: 0.25em; font-family: ui-monospace, monospace; font-size: 0.875em; }
+        .markdown-preview pre { background-color: #1f2937; color: #f3f4f6; padding: 1em; border-radius: 0.5em; overflow-x: auto; margin-bottom: 1em; }
+        .markdown-preview pre code { background-color: transparent; padding: 0; color: inherit; }
+        .markdown-preview strong { font-weight: 600; color: #111827; }
+        .markdown-preview hr { border: 0; border-top: 1px solid #e5e7eb; margin: 2em 0; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden font-sans">
@@ -23,12 +41,12 @@
     <nav class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-3">
             <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-                <i class="fa-solid fa-file-pdf"></i>
+                <i class="fa-brands fa-markdown"></i>
             </div>
-            <h1 class="font-bold text-lg text-slate-700">PDF <span class="text-blue-600">Structure</span> Extractor</h1>
+            <h1 class="font-bold text-lg text-slate-700">PDF <span class="text-blue-600">Markdown</span> Studio</h1>
         </div>
-        <div class="text-xs text-slate-400 font-medium">
-            <i class="fa-solid fa-shield-halved mr-1"></i> 100% Client-Side • No Uploads
+        <div class="text-xs text-slate-400 font-medium hidden sm:block">
+            <i class="fa-solid fa-shield-halved mr-1"></i> 100% Client-Side
         </div>
     </nav>
 
@@ -36,7 +54,7 @@
     <main class="flex-1 flex overflow-hidden">
         
         <!-- Sidebar / Settings -->
-        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 shadow-sm overflow-y-auto">
+        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 shadow-sm overflow-y-auto hidden md:flex">
             <div class="p-6 space-y-8">
                 
                 <!-- File Input Section -->
@@ -52,45 +70,36 @@
                     </div>
                 </div>
 
-                <!-- Conversion Settings -->
+                <!-- Heuristics -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Output Format</label>
-                    <div class="flex bg-slate-100 p-1 rounded-lg">
-                        <button id="btn-markdown" class="flex-1 py-1.5 text-sm font-medium rounded-md bg-white text-blue-600 shadow-sm transition-all">Markdown</button>
-                        <button id="btn-latex" class="flex-1 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all">LaTeX</button>
-                    </div>
-                </div>
-
-                <!-- Advanced Options -->
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Heuristics</label>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Extraction Rules</label>
                     <div class="space-y-3">
                         <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
                             <input type="checkbox" id="opt-headers" checked class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
                             <div class="text-sm">
                                 <span class="font-medium text-slate-700">Detect Headers</span>
-                                <p class="text-xs text-slate-400">Uses font size analysis</p>
+                                <p class="text-xs text-slate-400">Auto-tag # H1, ## H2</p>
                             </div>
                         </label>
                         <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
                             <input type="checkbox" id="opt-footers" checked class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
                             <div class="text-sm">
-                                <span class="font-medium text-slate-700">Strip Footers/Headers</span>
-                                <p class="text-xs text-slate-400">Remove top/bottom 5% text</p>
+                                <span class="font-medium text-slate-700">Strip Footers</span>
+                                <p class="text-xs text-slate-400">Clean edges (top/bottom 5%)</p>
                             </div>
                         </label>
                         <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
                             <input type="checkbox" id="opt-breaks" checked class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
                             <div class="text-sm">
                                 <span class="font-medium text-slate-700">Smart Paragraphs</span>
-                                <p class="text-xs text-slate-400">Merge broken lines</p>
+                                <p class="text-xs text-slate-400">Join broken lines</p>
                             </div>
                         </label>
                         <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
                             <input type="checkbox" id="opt-page-breaks" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
                             <div class="text-sm">
                                 <span class="font-medium text-slate-700">Remove Page Breaks</span>
-                                <p class="text-xs text-slate-400">Hide page markers</p>
+                                <p class="text-xs text-slate-400">Merge into one document</p>
                             </div>
                         </label>
                     </div>
@@ -98,8 +107,8 @@
 
                 <!-- Action Button -->
                 <button id="convert-btn" disabled class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
-                    <span>Extract Text</span>
-                    <i class="fa-solid fa-bolt"></i>
+                    <span>Extract & Review</span>
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
                 </button>
                 
                 <div id="status-area" class="hidden">
@@ -115,33 +124,43 @@
             </div>
         </aside>
 
-        <!-- Editor Area -->
-        <section class="flex-1 flex flex-col bg-slate-50 relative">
-            <div class="flex-1 p-6 relative">
-                <textarea id="output-editor" class="w-full h-full resize-none border border-slate-300 rounded-lg p-6 font-mono text-sm leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none shadow-sm bg-white text-slate-700" placeholder="Extracted text will appear here..."></textarea>
-                
-                <!-- Floating Action Buttons -->
-                <div class="absolute top-10 right-10 flex gap-2">
-                    <button id="copy-btn" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-blue-600 px-4 py-2 rounded-lg shadow-sm text-sm font-medium transition-all flex items-center gap-2" title="Copy to Clipboard">
-                        <i class="fa-regular fa-copy"></i> Copy
-                    </button>
-                    <button id="download-btn" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-blue-600 px-4 py-2 rounded-lg shadow-sm text-sm font-medium transition-all flex items-center gap-2" title="Download File">
-                        <i class="fa-solid fa-download"></i> Download
+        <!-- Editor & Preview Area -->
+        <section class="flex-1 flex flex-col md:flex-row bg-slate-100 overflow-hidden relative">
+            
+            <!-- Left: Raw Markdown Editor -->
+            <div class="flex-1 flex flex-col h-1/2 md:h-full border-r border-slate-200 bg-white">
+                <div class="px-4 py-2 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
+                    <span><i class="fa-solid fa-code mr-2"></i>Raw Markdown</span>
+                    <button id="copy-btn" class="hover:text-blue-600 transition-colors" title="Copy Raw Text">
+                        <i class="fa-regular fa-copy"></i>
                     </button>
                 </div>
+                <textarea id="output-editor" class="flex-1 w-full resize-none p-6 font-mono text-sm leading-relaxed outline-none text-slate-700 overflow-y-auto" placeholder="1. Drag a PDF file&#10;2. Click Extract&#10;3. Review the Markdown here..."></textarea>
             </div>
+
+            <!-- Right: Rendered Preview -->
+            <div class="flex-1 flex flex-col h-1/2 md:h-full bg-white">
+                <div class="px-4 py-2 border-b border-slate-100 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
+                    <span><i class="fa-solid fa-eye mr-2"></i>Preview</span>
+                    <button id="download-btn" class="hover:text-blue-600 transition-colors" title="Download .md file">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                </div>
+                <div id="preview-pane" class="flex-1 p-8 overflow-y-auto markdown-preview bg-white">
+                    <p class="text-slate-400 italic text-center mt-10">Preview will appear here...</p>
+                </div>
+            </div>
+
         </section>
 
     </main>
 
     <script>
         // --- Configuration & State ---
-        // Configure PDF.js worker (uses the same version as the main library)
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         const state = {
             file: null,
-            mode: 'markdown', // 'markdown' or 'latex'
             isProcessing: false,
             heuristics: {
                 detectHeaders: true,
@@ -157,8 +176,7 @@
         const fileNameDisplay = document.getElementById('file-name');
         const convertBtn = document.getElementById('convert-btn');
         const outputEditor = document.getElementById('output-editor');
-        const btnMarkdown = document.getElementById('btn-markdown');
-        const btnLatex = document.getElementById('btn-latex');
+        const previewPane = document.getElementById('preview-pane');
         const copyBtn = document.getElementById('copy-btn');
         const downloadBtn = document.getElementById('download-btn');
         const statusArea = document.getElementById('status-area');
@@ -168,26 +186,6 @@
 
         // --- Event Listeners ---
         
-        // Mode Switching
-        const setMode = (mode) => {
-            state.mode = mode;
-            if (mode === 'markdown') {
-                btnMarkdown.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
-                btnMarkdown.classList.remove('text-slate-500');
-                btnLatex.classList.remove('bg-white', 'text-blue-600', 'shadow-sm');
-                btnLatex.classList.add('text-slate-500');
-            } else {
-                btnLatex.classList.add('bg-white', 'text-blue-600', 'shadow-sm');
-                btnLatex.classList.remove('text-slate-500');
-                btnMarkdown.classList.remove('bg-white', 'text-blue-600', 'shadow-sm');
-                btnMarkdown.classList.add('text-slate-500');
-            }
-            if (outputEditor.value.length > 0) convertFile(); // Re-convert if file loaded
-        };
-
-        btnMarkdown.addEventListener('click', () => setMode('markdown'));
-        btnLatex.addEventListener('click', () => setMode('latex'));
-
         // Drag & Drop
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-active'));
@@ -208,20 +206,29 @@
         // Actions
         convertBtn.addEventListener('click', convertFile);
         
+        // Sync Editor to Preview
+        outputEditor.addEventListener('input', () => {
+            updatePreview(outputEditor.value);
+        });
+
         copyBtn.addEventListener('click', () => {
             outputEditor.select();
             document.execCommand('copy');
-            const originalHTML = copyBtn.innerHTML;
-            copyBtn.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
-            setTimeout(() => copyBtn.innerHTML = originalHTML, 2000);
+            const icon = copyBtn.querySelector('i');
+            icon.classList.remove('fa-copy');
+            icon.classList.add('fa-check');
+            setTimeout(() => {
+                icon.classList.remove('fa-check');
+                icon.classList.add('fa-copy');
+            }, 1000);
         });
 
         downloadBtn.addEventListener('click', () => {
-            const blob = new Blob([outputEditor.value], { type: 'text/plain' });
+            const blob = new Blob([outputEditor.value], { type: 'text/markdown' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `extracted.${state.mode === 'markdown' ? 'md' : 'tex'}`;
+            a.download = `extracted_${Date.now()}.md`;
             a.click();
             URL.revokeObjectURL(url);
         });
@@ -238,10 +245,18 @@
             convertBtn.disabled = false;
         }
 
+        function updatePreview(markdown) {
+            if (!markdown.trim()) {
+                previewPane.innerHTML = '<p class="text-slate-400 italic text-center mt-10">Preview will appear here...</p>';
+                return;
+            }
+            // Use Marked.js to parse markdown
+            previewPane.innerHTML = marked.parse(markdown);
+        }
+
         async function convertFile() {
             if (!state.file) return;
 
-            // UI Reset
             state.isProcessing = true;
             convertBtn.disabled = true;
             outputEditor.value = "";
@@ -253,18 +268,13 @@
                 const loadingTask = pdfjsLib.getDocument(arrayBuffer);
                 const pdf = await loadingTask.promise;
 
-                // Step 1: Analyze Font Statistics (Pass 1)
-                // We sample the first 5 pages (or fewer) to find the "Body Text" font size
+                // Step 1: Analyze Font Statistics
                 updateProgress(5, "Analyzing Document Structure...");
                 const fontStats = await analyzeFonts(pdf);
                 
-                // Step 2: Extract and Process Text (Pass 2)
+                // Step 2: Extract and Process Text
                 let finalOutput = "";
                 
-                if (state.mode === 'latex') {
-                    finalOutput += `\\documentclass{article}\n\\usepackage[utf8]{inputenc}\n\\usepackage[margin=1in]{geometry}\n\n\\title{Extracted Document}\n\\date{\\today}\n\n\\begin{document}\n\n\\maketitle\n\n`;
-                }
-
                 for (let i = 1; i <= pdf.numPages; i++) {
                     updateProgress(Math.round((i / pdf.numPages) * 100), `Processing page ${i} of ${pdf.numPages}...`);
                     
@@ -272,16 +282,12 @@
                     const viewport = page.getViewport({ scale: 1.0 });
                     const textContent = await page.getTextContent();
                     
-                    // Process the page content
                     const pageText = processPageText(textContent.items, viewport, fontStats, i);
                     finalOutput += pageText;
                 }
 
-                if (state.mode === 'latex') {
-                    finalOutput += `\n\\end{document}`;
-                }
-
                 outputEditor.value = finalOutput;
+                updatePreview(finalOutput); // Initial render
                 updateProgress(100, "Done!");
 
             } catch (error) {
@@ -305,8 +311,6 @@
                 
                 textContent.items.forEach(item => {
                     if (!item.str.trim()) return;
-                    // transform[3] is typically the font height/scale
-                    // sometimes transform[0] is used depending on rotation, but [3] is reliable for horizontal text
                     const height = Math.round(Math.abs(item.transform[3])); 
                     if (height > 0) {
                         fontSizes[height] = (fontSizes[height] || 0) + item.str.length;
@@ -314,36 +318,29 @@
                 });
             }
 
-            // Find the most common font size (Mode) -> This is likely body text
             let maxCount = 0;
-            let bodySize = 10; // Default fallback
+            let bodySize = 10;
             for (const size in fontSizes) {
                 if (fontSizes[size] > maxCount) {
                     maxCount = fontSizes[size];
                     bodySize = parseInt(size);
                 }
             }
-
             return { bodySize };
         }
 
         function processPageText(items, viewport, fontStats, pageNum) {
-            // 1. Sort items by Y (descending - top to bottom) and X (ascending - left to right)
-            // PDF coordinates: (0,0) is bottom-left.
-            // We allow a small tolerance (yTolerance) for items on the same "visual" line
             const yTolerance = 2; 
 
             const sortedItems = items.sort((a, b) => {
                 const yA = a.transform[5];
                 const yB = b.transform[5];
-                // If they are on roughly the same line
                 if (Math.abs(yA - yB) < yTolerance) {
-                    return a.transform[4] - b.transform[4]; // Sort by X
+                    return a.transform[4] - b.transform[4];
                 }
-                return yB - yA; // Sort by Y (Top down)
+                return yB - yA;
             });
 
-            // 2. Filter logic (Headers/Footers)
             const height = viewport.height;
             const filteredItems = sortedItems.filter(item => {
                 if (!item.str.trim()) return false;
@@ -352,80 +349,50 @@
                     const y = item.transform[5];
                     const isTop = y > height * 0.95;
                     const isBottom = y < height * 0.05;
-                    // Simple heuristic: if it's at the very edge, ignore it
                     if (isTop || isBottom) return false;
                 }
                 return true;
             });
 
-            // 3. Reconstruction Logic
             let output = "";
             let currentLineY = -1;
             let currentBlock = "";
             
-            // For LaTeX escaping
-            const escapeLatex = (text) => {
-                return text
-                    .replace(/\\/g, '\\textbackslash ')
-                    .replace(/([&%$#_{}])/g, '\\$1')
-                    .replace(/~/g, '\\textasciitilde ')
-                    .replace(/\^/g, '\\textasciicircum ');
-            };
-
             filteredItems.forEach((item, index) => {
                 const fontSize = Math.abs(item.transform[3]);
                 const y = item.transform[5];
-                const x = item.transform[4];
                 let text = item.str;
 
-                // Latex Escaping
-                if (state.mode === 'latex') text = escapeLatex(text);
-
-                // Detect Header
                 let prefix = "";
                 let suffix = "";
                 
                 if (state.heuristics.detectHeaders) {
-                    // If font is significantly larger than body (e.g., 1.2x)
                     if (fontSize > fontStats.bodySize * 1.5) {
-                        prefix = state.mode === 'markdown' ? "## " : "\\section*{";
-                        suffix = state.mode === 'markdown' ? "" : "}";
+                        prefix = "## ";
                     } else if (fontSize > fontStats.bodySize * 1.1) {
-                        prefix = state.mode === 'markdown' ? "### " : "\\subsection*{";
-                        suffix = state.mode === 'markdown' ? "" : "}";
+                        prefix = "### ";
                     }
                 }
 
-                // Determine breaks
                 if (currentLineY === -1) {
-                    // First item
                     currentBlock += prefix + text + suffix;
                     currentLineY = y;
                 } else {
-                    const dy = currentLineY - y; // Positive means we went down
+                    const dy = currentLineY - y; 
                     
                     if (Math.abs(dy) < 5) {
-                        // Same line (roughly)
-                        // Add space if previous item didn't end with hyphen
-                        // In strict PDF, we'd check x-coords, but simple space join works 90% of time
                         if (!currentBlock.endsWith("-")) currentBlock += " ";
-                        else currentBlock = currentBlock.slice(0, -1); // Remove hyphen
-                        
+                        else currentBlock = currentBlock.slice(0, -1);
                         currentBlock += prefix + text + suffix;
-                    
                     } else {
-                        // New line
-                        // Check if it's a new paragraph or just a wrapped line
-                        const isNewParagraph = dy > (fontSize * 1.5); // If gap is > 1.5x font size
+                        const isNewParagraph = dy > (fontSize * 1.5);
                         
                         if (state.heuristics.smartParagraphs && !isNewParagraph && prefix === "") {
-                            // Just a line wrap, join with space
                              if (!currentBlock.endsWith("-")) currentBlock += " ";
                              else currentBlock = currentBlock.slice(0, -1);
                              currentBlock += text;
                         } else {
-                            // Hard break
-                            output += currentBlock + (state.mode === 'latex' ? "\n\n" : "\n\n");
+                            output += currentBlock + "\n\n";
                             currentBlock = prefix + text + suffix;
                         }
                     }
@@ -433,11 +400,9 @@
                 }
             });
 
-            // Flush last block
             output += currentBlock + "\n\n";
 
-            // Add Page Break indicator for Markdown
-            if (state.mode === 'markdown' && !state.heuristics.removePageBreaks) {
+            if (!state.heuristics.removePageBreaks) {
                 output += `\n<!-- Page ${pageNum} -->\n\n`;
             }
 
@@ -449,7 +414,6 @@
             statusPercent.innerText = `${percent}%`;
             statusText.innerText = text;
         }
-
     </script>
 </body>
 </html>
