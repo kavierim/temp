@@ -18,7 +18,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         .drag-active { border-color: #3b82f6; background-color: #eff6ff; }
 
-        /* Markdown Preview Styles (Tailwind resets these, so we need to restore them for the preview) */
+        /* Markdown Preview Styles */
         .markdown-preview { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: #374151; line-height: 1.6; }
         .markdown-preview h1 { font-size: 1.75em; font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.2em; }
         .markdown-preview h2 { font-size: 1.5em; font-weight: 600; margin-top: 1em; margin-bottom: 0.5em; color: #1f2937; }
@@ -33,6 +33,11 @@
         .markdown-preview pre code { background-color: transparent; padding: 0; color: inherit; }
         .markdown-preview strong { font-weight: 600; color: #111827; }
         .markdown-preview hr { border: 0; border-top: 1px solid #e5e7eb; margin: 2em 0; }
+        
+        /* Table Styles for Preview */
+        .markdown-preview table { width: 100%; border-collapse: collapse; margin-bottom: 1em; }
+        .markdown-preview th, .markdown-preview td { border: 1px solid #e5e7eb; padding: 0.5em; text-align: left; }
+        .markdown-preview th { background-color: #f9fafb; font-weight: 600; }
 
         /* Resizer Styles */
         .resizer {
@@ -96,6 +101,13 @@
                             <div class="text-sm">
                                 <span class="font-medium text-slate-700">Detect Headers</span>
                                 <p class="text-xs text-slate-400">Auto-tag # H1, ## H2</p>
+                            </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
+                            <input type="checkbox" id="opt-tables" checked class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+                            <div class="text-sm">
+                                <span class="font-medium text-slate-700">Detect Tables</span>
+                                <p class="text-xs text-slate-400">Convert grids to Markdown tables</p>
                             </div>
                         </label>
                         <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
@@ -184,6 +196,7 @@
             isProcessing: false,
             heuristics: {
                 detectHeaders: true,
+                detectTables: true,
                 stripFooters: true,
                 smartParagraphs: true,
                 removePageBreaks: false
@@ -227,21 +240,19 @@
 
         // Settings Toggles
         document.getElementById('opt-headers').addEventListener('change', (e) => state.heuristics.detectHeaders = e.target.checked);
+        document.getElementById('opt-tables').addEventListener('change', (e) => state.heuristics.detectTables = e.target.checked);
         document.getElementById('opt-footers').addEventListener('change', (e) => state.heuristics.stripFooters = e.target.checked);
         document.getElementById('opt-breaks').addEventListener('change', (e) => state.heuristics.smartParagraphs = e.target.checked);
         document.getElementById('opt-page-breaks').addEventListener('change', (e) => state.heuristics.removePageBreaks = e.target.checked);
 
-        // Sidebar Toggle - Fixed Logic for Desktop & Mobile
+        // Sidebar Toggle
         sidebarToggle.addEventListener('click', () => {
-            // We use getComputedStyle to check actual visibility because md:flex overrides hidden class
             const isHidden = window.getComputedStyle(sidebar).display === 'none';
             
             if (isHidden) {
-                // To show: remove hidden, ensure flex is added
                 sidebar.classList.remove('hidden');
                 sidebar.classList.add('flex');
             } else {
-                // To hide: add hidden, remove flex, AND remove md:flex (which forces display on desktop)
                 sidebar.classList.add('hidden');
                 sidebar.classList.remove('flex');
                 sidebar.classList.remove('md:flex');
@@ -262,13 +273,9 @@
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
             const containerRect = mainSection.getBoundingClientRect();
-            // Calculate percentage width for left panel
             let newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-            
-            // Constraints (10% to 90%)
             if (newWidth < 10) newWidth = 10;
             if (newWidth > 90) newWidth = 90;
-
             leftPanel.style.width = `${newWidth}%`;
         });
 
@@ -285,7 +292,6 @@
         // Actions
         convertBtn.addEventListener('click', convertFile);
         
-        // Sync Editor to Preview
         outputEditor.addEventListener('input', () => {
             updatePreview(outputEditor.value);
         });
@@ -329,7 +335,6 @@
                 previewPane.innerHTML = '<p class="text-slate-400 italic text-center mt-10">Preview will appear here...</p>';
                 return;
             }
-            // Use Marked.js to parse markdown
             previewPane.innerHTML = marked.parse(markdown);
         }
 
@@ -347,11 +352,9 @@
                 const loadingTask = pdfjsLib.getDocument(arrayBuffer);
                 const pdf = await loadingTask.promise;
 
-                // Step 1: Analyze Font Statistics
                 updateProgress(5, "Analyzing Document Structure...");
                 const fontStats = await analyzeFonts(pdf);
                 
-                // Step 2: Extract and Process Text
                 let finalOutput = "";
                 
                 for (let i = 1; i <= pdf.numPages; i++) {
@@ -366,7 +369,7 @@
                 }
 
                 outputEditor.value = finalOutput;
-                updatePreview(finalOutput); // Initial render
+                updatePreview(finalOutput); 
                 updateProgress(100, "Done!");
 
             } catch (error) {
@@ -409,21 +412,10 @@
         }
 
         function processPageText(items, viewport, fontStats, pageNum) {
-            const yTolerance = 2; 
-
-            const sortedItems = items.sort((a, b) => {
-                const yA = a.transform[5];
-                const yB = b.transform[5];
-                if (Math.abs(yA - yB) < yTolerance) {
-                    return a.transform[4] - b.transform[4];
-                }
-                return yB - yA;
-            });
-
+            // 1. Filter out invisible or header/footer items
             const height = viewport.height;
-            const filteredItems = sortedItems.filter(item => {
+            const validItems = items.filter(item => {
                 if (!item.str.trim()) return false;
-                
                 if (state.heuristics.stripFooters) {
                     const y = item.transform[5];
                     const isTop = y > height * 0.95;
@@ -433,58 +425,188 @@
                 return true;
             });
 
-            let output = "";
-            let currentLineY = -1;
-            let currentBlock = "";
-            
-            filteredItems.forEach((item, index) => {
-                const fontSize = Math.abs(item.transform[3]);
-                const y = item.transform[5];
-                let text = item.str;
-
-                let prefix = "";
-                let suffix = "";
-                
-                if (state.heuristics.detectHeaders) {
-                    if (fontSize > fontStats.bodySize * 1.5) {
-                        prefix = "## ";
-                    } else if (fontSize > fontStats.bodySize * 1.1) {
-                        prefix = "### ";
-                    }
+            // 2. Sort by Y descending, then X ascending
+            const yTolerance = 3; 
+            validItems.sort((a, b) => {
+                const yA = a.transform[5];
+                const yB = b.transform[5];
+                if (Math.abs(yA - yB) < yTolerance) {
+                    return a.transform[4] - b.transform[4];
                 }
-
-                if (currentLineY === -1) {
-                    currentBlock += prefix + text + suffix;
-                    currentLineY = y;
-                } else {
-                    const dy = currentLineY - y; 
-                    
-                    if (Math.abs(dy) < 5) {
-                        if (!currentBlock.endsWith("-")) currentBlock += " ";
-                        else currentBlock = currentBlock.slice(0, -1);
-                        currentBlock += prefix + text + suffix;
-                    } else {
-                        const isNewParagraph = dy > (fontSize * 1.5);
-                        
-                        if (state.heuristics.smartParagraphs && !isNewParagraph && prefix === "") {
-                             if (!currentBlock.endsWith("-")) currentBlock += " ";
-                             else currentBlock = currentBlock.slice(0, -1);
-                             currentBlock += text;
-                        } else {
-                            output += currentBlock + "\n\n";
-                            currentBlock = prefix + text + suffix;
-                        }
-                    }
-                    currentLineY = y;
-                }
+                return yB - yA;
             });
 
-            output += currentBlock + "\n\n";
+            // 3. Group into logical rows & Merge close horizontal items
+            const rows = [];
+            let currentRow = null;
+
+            validItems.forEach(item => {
+                const y = item.transform[5];
+                const x = item.transform[4];
+                const fontSize = Math.abs(item.transform[3]);
+                const width = item.width;
+                const text = item.str;
+
+                if (!currentRow || Math.abs(y - currentRow.y) > yTolerance) {
+                    // Start new row
+                    if (currentRow) rows.push(currentRow);
+                    currentRow = { y, fontSize, items: [{ x, width, text }] };
+                } else {
+                    // Add to current row
+                    const lastItem = currentRow.items[currentRow.items.length - 1];
+                    // Check if visually close (merge)
+                    if (x - (lastItem.x + lastItem.width) < 15) { // 15px gap tolerance for merging words
+                        lastItem.text += text; // Append text (pdf.js sometimes splits words)
+                        lastItem.width += width + (x - (lastItem.x + lastItem.width));
+                    } else {
+                        currentRow.items.push({ x, width, text });
+                    }
+                }
+            });
+            if (currentRow) rows.push(currentRow);
+
+            // 4. Identify blocks (Table vs Text)
+            // A "Table Block" is a sequence of rows where multiple rows have multiple distinct items (columns)
+            const blocks = [];
+            let currentBlock = { type: 'text', rows: [] };
+
+            rows.forEach(row => {
+                const isTableCandidate = state.heuristics.detectTables && row.items.length > 1;
+
+                if (currentBlock.type === 'text') {
+                    if (isTableCandidate) {
+                        // Switch to table? Only if we have accumulated text or just started
+                        // We push current text block and start a table block
+                        if (currentBlock.rows.length > 0) blocks.push(currentBlock);
+                        currentBlock = { type: 'table', rows: [row] };
+                    } else {
+                        currentBlock.rows.push(row);
+                    }
+                } else { // Current is table
+                    if (isTableCandidate) {
+                        currentBlock.rows.push(row);
+                    } else {
+                        // Switch back to text
+                        blocks.push(currentBlock);
+                        currentBlock = { type: 'text', rows: [row] };
+                    }
+                }
+            });
+            if (currentBlock.rows.length > 0) blocks.push(currentBlock);
+
+
+            // 5. Render Blocks
+            let output = "";
+
+            blocks.forEach(block => {
+                if (block.type === 'table' && block.rows.length > 1) { // Ignore single-row tables (likely just spread text)
+                    output += renderTable(block.rows);
+                } else {
+                    output += renderText(block.rows, fontStats);
+                }
+            });
 
             if (!state.heuristics.removePageBreaks) {
                 output += `\n<!-- Page ${pageNum} -->\n\n`;
             }
 
+            return output;
+        }
+
+        function renderTable(rows) {
+            // 1. Identify Columns (Cluster X-coordinates)
+            const allX = [];
+            rows.forEach(row => row.items.forEach(i => allX.push(i.x)));
+            
+            // Simple clustering: sort X, find gaps > tolerance
+            allX.sort((a, b) => a - b);
+            const columns = [];
+            if (allX.length > 0) {
+                columns.push(allX[0]);
+                for (let i = 1; i < allX.length; i++) {
+                    if (allX[i] - allX[i-1] > 20) { // 20px gap to define new column
+                        columns.push(allX[i]);
+                    }
+                }
+            }
+
+            // 2. Map items to columns
+            let tableMd = "\n";
+            // Header row (first row of block)
+            const headerRow = rows[0];
+            const headers = new Array(columns.length).fill("   ");
+            headerRow.items.forEach(item => {
+                const colIndex = getClosestColumnIndex(item.x, columns);
+                headers[colIndex] = item.text.trim();
+            });
+            tableMd += `| ${headers.join(" | ")} |\n`;
+            tableMd += `| ${headers.map(() => "---").join(" | ")} |\n`;
+
+            // Data rows
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const cells = new Array(columns.length).fill("");
+                row.items.forEach(item => {
+                    const colIndex = getClosestColumnIndex(item.x, columns);
+                    cells[colIndex] = item.text.trim();
+                });
+                tableMd += `| ${cells.join(" | ")} |\n`;
+            }
+            return tableMd + "\n";
+        }
+
+        function getClosestColumnIndex(x, columns) {
+            let closest = 0;
+            let minDiff = Math.abs(x - columns[0]);
+            for (let i = 1; i < columns.length; i++) {
+                const diff = Math.abs(x - columns[i]);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = i;
+                }
+            }
+            return closest;
+        }
+
+        function renderText(rows, fontStats) {
+            let output = "";
+            let currentBlock = "";
+            let prevRow = null;
+
+            rows.forEach(row => {
+                // Since this is a text block, we assume items in a row should be joined with spaces
+                const rowText = row.items.map(i => i.text).join(" ");
+                const fontSize = row.fontSize;
+                
+                // Header detection
+                let prefix = "";
+                if (state.heuristics.detectHeaders) {
+                    if (fontSize > fontStats.bodySize * 1.5) prefix = "## ";
+                    else if (fontSize > fontStats.bodySize * 1.1) prefix = "### ";
+                }
+
+                // Paragraph detection
+                if (!prevRow) {
+                    currentBlock = prefix + rowText;
+                } else {
+                    const dy = prevRow.y - row.y;
+                    const isNewParagraph = dy > (fontSize * 1.5);
+                    
+                    if (state.heuristics.smartParagraphs && !isNewParagraph && !prefix) {
+                        // Merge lines
+                         if (!currentBlock.endsWith("-")) currentBlock += " ";
+                         else currentBlock = currentBlock.slice(0, -1);
+                         currentBlock += rowText;
+                    } else {
+                        // Flush
+                        output += currentBlock + "\n\n";
+                        currentBlock = prefix + rowText;
+                    }
+                }
+                prevRow = row;
+            });
+            
+            if (currentBlock) output += currentBlock + "\n\n";
             return output;
         }
 
