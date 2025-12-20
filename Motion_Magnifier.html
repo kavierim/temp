@@ -150,6 +150,20 @@
         
         .fullscreen-btn { right: 1rem; }
         .settings-btn { right: 4rem; }
+        .record-btn { right: 7rem; }
+        
+        .record-btn.recording {
+            background-color: #fee2e2;
+            color: #dc2626;
+            border-color: #ef4444;
+            animation: pulse-red 2s infinite;
+        }
+        
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
         
         body.is-fullscreen header, 
         body.is-fullscreen .controls-panel, 
@@ -171,7 +185,7 @@
 <body class="min-h-screen flex flex-col items-center p-4 md:p-8">
 
     <!-- Setup Modal -->
-    <div id="setupModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div id="setupModal" class="fixed inset-0 z-[10002] flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 border border-slate-100 transform transition-all">
             <h2 class="text-2xl font-bold text-slate-900 mb-2">Camera Setup</h2>
             <p class="text-slate-500 mb-6 text-sm">Choose your device and quality settings.</p>
@@ -212,6 +226,15 @@
 
     <main class="w-full flex flex-col items-center">
         <div id="container" class="canvas-container group mb-6">
+            
+            <!-- Record Button -->
+            <button id="recordBtn" class="overlay-btn record-btn shadow-sm" title="Start/Stop Recording">
+                <svg id="rec-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  <circle cx="12" cy="12" r="3" fill="currentColor" class="text-red-500" />
+                </svg>
+            </button>
+
             <button id="persistentSettingsBtn" class="overlay-btn settings-btn shadow-sm" title="Camera Settings">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -249,14 +272,24 @@
             <canvas id="graphCanvas" class="w-full h-32 rounded-lg bg-slate-50 border border-slate-100"></canvas>
         </div>
 
-        <div class="controls-panel w-full max-w-3xl rounded-3xl p-8 grid grid-cols-1 md:grid-cols-2 gap-10 shadow-sm mb-12 transition-opacity duration-300">
+        <div class="controls-panel w-full max-w-3xl rounded-3xl p-8 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8 shadow-sm mb-12 transition-opacity duration-300">
             <!-- Gain Control -->
             <div class="space-y-4">
                 <div class="flex justify-between items-center">
-                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Amplification</label>
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Amplification (Gain)</label>
                     <span id="gainVal" class="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg font-mono text-sm font-bold">15x</span>
                 </div>
                 <input type="range" id="gainInput" min="1" max="100" value="15" aria-label="Gain Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <!-- Spatial Smoothing (Laplacian Decomposition Approximation) -->
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Spatial Filter</label>
+                    <span id="spatialVal" class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg font-mono text-sm font-bold">2.0px</span>
+                </div>
+                <input type="range" id="spatialInput" min="0" max="100" value="20" aria-label="Spatial Decomposition Filter" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-xs text-slate-400 mt-1">Isolates broad motion; reduces sharp edge artifacts.</p>
             </div>
 
             <!-- Frequency Filters Block -->
@@ -287,6 +320,15 @@
                 <input type="range" id="zoomInput" min="10" max="40" value="10" aria-label="Zoom Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
             </div>
 
+            <!-- Persistence Control -->
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Persistence</label>
+                    <span id="burnVal" class="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg font-mono text-sm font-bold">0.95</span>
+                </div>
+                <input type="range" id="burnInput" min="50" max="99" value="95" aria-label="Burn Persistence Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
             <!-- Burn Motion Control -->
             <div class="space-y-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
                 <div class="flex justify-between items-center">
@@ -309,16 +351,7 @@
                 </div>
             </div>
 
-            <!-- Persistence Control -->
-            <div class="space-y-4">
-                <div class="flex justify-between items-center">
-                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Persistence</label>
-                    <span id="burnVal" class="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg font-mono text-sm font-bold">0.95</span>
-                </div>
-                <input type="range" id="burnInput" min="50" max="99" value="95" aria-label="Burn Persistence Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
-            </div>
-
-            <div class="space-y-4 flex flex-col justify-end">
+            <div class="space-y-4 flex flex-col justify-end md:col-span-2">
                 <button id="quickSetupBtn" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
                     Change Device / Quality
                 </button>
@@ -359,10 +392,9 @@
                     <h4 class="font-bold text-emerald-600 mb-2 italic">Key Features</h4>
                     <ul class="list-disc ml-5 text-sm space-y-2">
                         <li><strong>GPU Acceleration:</strong> Uses WebGL 2.0 for lag-free processing.</li>
+                        <li><strong>Spatial Decomposition:</strong> High-quality spatial filtering to reduce edge halos.</li>
                         <li><strong>Live Data Plotting:</strong> Graph motion intensity in real-time.</li>
                         <li><strong>Frequency Filtering:</strong> Isolate specific vibration speeds.</li>
-                        <li><strong>Motion Burning:</strong> Visualize paths of movement over time.</li>
-                        <li><strong>Digital Zoom:</strong> Focus amplification on specific areas.</li>
                     </ul>
                 </div>
             </div>
@@ -400,6 +432,8 @@
         uniform float u_noise;
         uniform float u_gain;
         uniform float u_persistence;
+        uniform float u_spatial_radius;
+        uniform vec2 u_resolution;
         uniform bool u_burn_enabled;
 
         in vec2 v_texCoord;
@@ -407,6 +441,7 @@
         layout(location = 0) out vec4 out_avg;
         layout(location = 1) out vec4 out_fast;
         layout(location = 2) out vec4 out_burn;
+        layout(location = 3) out vec4 out_spatial_diff;
 
         void main() {
             vec2 uv = vec2(v_texCoord.x, 1.0 - v_texCoord.y); // Flip Y for WebGL
@@ -415,23 +450,43 @@
             vec4 prev_fast = texture(u_fast_prev, v_texCoord);
             vec4 prev_burn = texture(u_burn_prev, v_texCoord);
 
-            // Temporal Smoothing (Low Pass)
+            // 1. Temporal Filtering
             vec3 new_avg = prev_avg.rgb * u_smooth + current.rgb * (1.0 - u_smooth);
-            
-            // Noise Filter (High Pass approximation)
             vec3 new_fast = prev_fast.rgb * u_noise + current.rgb * (1.0 - u_noise);
             
-            vec3 diff = new_fast - new_avg;
-            vec3 abs_diff = abs(diff);
-            
+            // 2. Burn Logic (Instantaneous)
+            vec3 raw_diff = new_fast - new_avg;
+            vec3 abs_diff = abs(raw_diff);
             vec3 new_burn = vec3(0.0);
             if (u_burn_enabled) {
                 new_burn = max(prev_burn.rgb * u_persistence, abs_diff * u_gain);
+            }
+
+            // 3. Spatial Decomposition (Spatial Low-Pass on the Difference Signal)
+            // We sample the neighborhood of the motion signal to isolate broad changes.
+            vec3 spatial_diff = vec3(0.0);
+            if (u_spatial_radius > 0.1) {
+                float total_w = 0.0;
+                int r = int(u_spatial_radius);
+                for(int x = -2; x <= 2; x++) {
+                    for(int y = -2; y <= 2; y++) {
+                        // Offset scale for sampling
+                        vec2 offset = vec2(float(x), float(y)) * u_spatial_radius / 2.0 / u_resolution;
+                        vec3 n_avg = texture(u_avg_prev, v_texCoord + offset).rgb;
+                        vec3 n_fast = texture(u_fast_prev, v_texCoord + offset).rgb;
+                        spatial_diff += (n_fast - n_avg);
+                        total_w += 1.0;
+                    }
+                }
+                spatial_diff /= total_w;
+            } else {
+                spatial_diff = raw_diff;
             }
             
             out_avg = vec4(new_avg, 1.0);
             out_fast = vec4(new_fast, 1.0);
             out_burn = vec4(new_burn, 1.0);
+            out_spatial_diff = vec4(spatial_diff + 0.5, 1.0);
         }
     </script>
 
@@ -443,6 +498,7 @@
         uniform sampler2D u_avg;
         uniform sampler2D u_fast;
         uniform sampler2D u_burn;
+        uniform sampler2D u_spatial_diff;
 
         uniform float u_gain;
         uniform float u_zoom;
@@ -454,17 +510,13 @@
         out vec4 out_color;
 
         void main() {
-            // Apply Zoom to UV
             vec2 center = vec2(0.5, 0.5);
             vec2 uv = (v_texCoord - center) / u_zoom + center;
-            vec2 vid_uv = vec2(uv.x, 1.0 - uv.y); // Flip Y for video source
+            vec2 vid_uv = vec2(uv.x, 1.0 - uv.y);
 
             vec4 current = texture(u_image, vid_uv);
-            vec4 avg = texture(u_avg, uv);
-            vec4 fast = texture(u_fast, uv);
             vec4 burn = texture(u_burn, uv);
-            
-            vec3 diff = fast.rgb - avg.rgb;
+            vec3 diff = texture(u_spatial_diff, uv).rgb - 0.5;
             
             vec3 color = vec3(0.0);
             
@@ -476,20 +528,16 @@
                 if (u_burn_enabled) amplified += burn.rgb;
                 color = clamp(amplified, 0.0, 1.0);
             } else if (u_mode == 2) { // Motion
-                vec3 motion = vec3(0.5) + diff * u_gain; // 0.5 grey center
+                vec3 motion = vec3(0.5) + diff * u_gain;
                 if (u_burn_enabled) motion += burn.rgb;
                 color = clamp(motion, 0.0, 1.0);
             }
 
-            // Crosshair overlay
             if (u_show_crosshair) {
-                // Draw at center (0.5, 0.5)
                 float cx = abs(v_texCoord.x - 0.5);
                 float cy = abs(v_texCoord.y - 0.5);
-                
-                // Cross dimensions (relative to screen space 0-1)
                 if ((cx < 0.002 && cy < 0.03) || (cy < 0.003 && cx < 0.03)) {
-                     color = vec3(1.0, 0.0, 0.0); // Red
+                     color = vec3(1.0, 0.0, 0.0);
                 }
             }
             
@@ -501,13 +549,10 @@
         const video = document.getElementById('videoElement');
         const mainCanvas = document.getElementById('mainCanvas');
         const container = document.getElementById('container');
-        
-        // Graph Elements
         const graphContainer = document.getElementById('graphContainer');
         const graphCanvas = document.getElementById('graphCanvas');
         const graphValue = document.getElementById('graphValue');
         
-        // UI Elements
         const openSetupBtn = document.getElementById('openSetupBtn');
         const quickSetupBtn = document.getElementById('quickSetupBtn');
         const persistentSettingsBtn = document.getElementById('persistentSettingsBtn');
@@ -517,12 +562,15 @@
         const cameraSelect = document.getElementById('cameraSelect');
         const resolutionSelect = document.getElementById('resolutionSelect');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const recIcon = document.getElementById('rec-icon');
         const fsIcon = document.getElementById('fs-icon');
         const statusOverlay = document.getElementById('statusOverlay');
         
-        // Controls
         const gainInput = document.getElementById('gainInput');
         const gainVal = document.getElementById('gainVal');
+        const spatialInput = document.getElementById('spatialInput');
+        const spatialVal = document.getElementById('spatialVal');
         const smoothInput = document.getElementById('smoothInput');
         const smoothVal = document.getElementById('smoothVal');
         const noiseInput = document.getElementById('noiseInput');
@@ -535,32 +583,34 @@
         const graphToggle = document.getElementById('graphToggle');
         const modeBtns = document.querySelectorAll('.mode-btn');
 
-        // WebGL Globals
         let gl;
         let programCompute, programDisplay;
         let textureVideo;
         let fboA, fboB;
-        let texAvgA, texFastA, texBurnA;
-        let texAvgB, texFastB, texBurnB;
+        let texAvgA, texFastA, texBurnA, texSpatialA;
+        let texAvgB, texFastB, texBurnB, texSpatialB;
         let quadVBO, quadVAO;
         let stream = null;
         let animationId = null;
-        let currentModeInt = 1; // 1 = Amplified
+        let currentModeInt = 1; 
 
-        // Graph Globals
         let graphCtx;
         let graphData = new Array(300).fill(0);
         let isGraphEnabled = false;
 
-        // Params
         let gain = 15;
-        let smoothing = 0.85;
-        let noiseFilter = 0.10;
+        let spatialRadius = 2.0;
+        let smoothing = 0.85; 
+        let noiseFilter = 0.10; 
         let persistence = 0.95;
         let zoomFactor = 1.0;
         let isBurnEnabled = false;
 
-        // UI Event Listeners
+        // Recording Globals
+        let mediaRecorder;
+        let recordedChunks = [];
+        let isRecording = false;
+
         const showSetup = async () => {
             setupModal.style.display = 'flex';
             await loadDevices();
@@ -592,19 +642,15 @@
             await startCamera(deviceId, height);
         });
 
-        // WebGL Initialization
         function initWebGL() {
             gl = mainCanvas.getContext('webgl2', { alpha: false, antialias: false });
             if (!gl) {
-                alert("WebGL 2.0 not supported. Please use a modern browser.");
+                alert("WebGL 2.0 not supported.");
                 return false;
             }
             gl.getExtension("EXT_color_buffer_float"); 
-            
-            // Graph Init
             graphCtx = graphCanvas.getContext('2d');
             
-            // Create Shaders
             const vsSource = document.getElementById('vs').text.trim();
             const fsComputeSource = document.getElementById('fs-compute').text.trim();
             const fsDisplaySource = document.getElementById('fs-display').text.trim();
@@ -612,38 +658,25 @@
             programCompute = createProgram(gl, vsSource, fsComputeSource);
             programDisplay = createProgram(gl, vsSource, fsDisplaySource);
 
-            // Create Quad
-            const vertices = new Float32Array([
-                -1, -1, 0, 0,
-                 1, -1, 1, 0,
-                -1,  1, 0, 1,
-                 1,  1, 1, 1
-            ]);
-            
+            const vertices = new Float32Array([-1,-1,0,0, 1,-1,1,0, -1,1,0,1, 1,1,1,1]);
             quadVBO = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
             gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-            
             quadVAO = gl.createVertexArray();
             gl.bindVertexArray(quadVAO);
-            gl.enableVertexAttribArray(0);
-            gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0); // Position
-            gl.enableVertexAttribArray(1);
-            gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 16, 8); // TexCoord
+            gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 16, 0); 
+            gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 16, 8); 
             
-            // Create Video Texture
             textureVideo = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, textureVideo);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
             return true;
         }
 
         function createTexturesAndFBOs(width, height) {
-            // Helper to create texture
             const createTex = () => {
                 const tex = gl.createTexture();
                 gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -655,36 +688,22 @@
                 return tex;
             };
 
-            // Setup Ping-Pong Set A
-            texAvgA = createTex();
-            texFastA = createTex();
-            texBurnA = createTex();
-            fboA = gl.createFramebuffer();
-            gl.bindFramebuffer(gl.FRAMEBUFFER, fboA);
+            texAvgA = createTex(); texFastA = createTex(); texBurnA = createTex(); texSpatialA = createTex();
+            fboA = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fboA);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texAvgA, 0);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, texFastA, 0);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, texBurnA, 0);
-            gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2]);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT3, gl.TEXTURE_2D, texSpatialA, 0);
+            gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
 
-            // Setup Ping-Pong Set B
-            texAvgB = createTex();
-            texFastB = createTex();
-            texBurnB = createTex();
-            fboB = gl.createFramebuffer();
-            gl.bindFramebuffer(gl.FRAMEBUFFER, fboB);
+            texAvgB = createTex(); texFastB = createTex(); texBurnB = createTex(); texSpatialB = createTex();
+            fboB = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fboB);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texAvgB, 0);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, texFastB, 0);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT2, gl.TEXTURE_2D, texBurnB, 0);
-            gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2]);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT3, gl.TEXTURE_2D, texSpatialB, 0);
+            gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
             
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            
-            // Clear textures to black initially
-            gl.bindFramebuffer(gl.FRAMEBUFFER, fboA);
-            gl.clearColor(0,0,0,0);
-            gl.clear(gl.COLOR_BUFFER_BIT);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, fboB);
-            gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
 
@@ -694,258 +713,204 @@
                 const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined, height: { ideal: targetHeight }, aspectRatio: 4/3 } };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
-                
                 if (!gl && !initWebGL()) return;
-
                 video.onloadedmetadata = () => {
-                    const w = video.videoWidth;
-                    const h = video.videoHeight;
-                    mainCanvas.width = w;
-                    mainCanvas.height = h;
-                    
+                    const w = video.videoWidth; const h = video.videoHeight;
+                    mainCanvas.width = w; mainCanvas.height = h;
                     gl.viewport(0, 0, w, h);
                     createTexturesAndFBOs(w, h);
-                    
-                    // Graph setup
-                    graphCanvas.width = graphCanvas.offsetWidth;
-                    graphCanvas.height = graphCanvas.offsetHeight;
-                    
+                    graphCanvas.width = graphCanvas.offsetWidth; graphCanvas.height = graphCanvas.offsetHeight;
                     statusOverlay.classList.add('opacity-0');
                     setTimeout(() => statusOverlay.style.display = 'none', 500);
-                    
                     if (animationId) cancelAnimationFrame(animationId);
                     requestAnimationFrame(renderLoop);
                 };
-            } catch (err) {
-                console.error(err);
-                alert("Could not start camera. Check permissions.");
-            }
+            } catch (err) { alert("Camera failed."); }
         }
 
         function updateGraph(destFBO) {
             if (!isGraphEnabled) return;
-
-            // Read from the FBO we just wrote to
             gl.bindFramebuffer(gl.READ_FRAMEBUFFER, destFBO);
-            
             const centerX = Math.floor(mainCanvas.width / 2);
             const centerY = Math.floor(mainCanvas.height / 2);
-
-            // Read Average Pixel
-            gl.readBuffer(gl.COLOR_ATTACHMENT0);
-            const pAvg = new Uint8Array(4);
-            gl.readPixels(centerX, centerY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pAvg);
-
-            // Read Fast Pixel
-            gl.readBuffer(gl.COLOR_ATTACHMENT1);
-            const pFast = new Uint8Array(4);
-            gl.readPixels(centerX, centerY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pFast);
-
-            // Calculate Difference Magnitude
-            // Normalize to 0-1 then apply gain for visualization
-            let sumDiff = 0;
-            for(let i=0; i<3; i++) {
-                sumDiff += Math.abs(pFast[i] - pAvg[i]);
-            }
-            // Average the 3 channels, normalize 255, multiply by gain
-            const val = (sumDiff / 3.0 / 255.0) * gain * 100; // *100 for better graph scale
-            
-            // Update Graph UI
+            gl.readBuffer(gl.COLOR_ATTACHMENT3); // Read Spatial Diff
+            const p = new Uint8Array(4);
+            gl.readPixels(centerX, centerY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, p);
+            let sum = 0; for(let i=0; i<3; i++) sum += Math.abs(p[i]/255.0 - 0.5);
+            const val = sum * gain * 20.0;
             graphValue.textContent = val.toFixed(2);
-            graphData.shift();
-            graphData.push(val);
+            graphData.shift(); graphData.push(val);
+            const ctx = graphCtx; const w = graphCanvas.width; const h = graphCanvas.height;
+            ctx.clearRect(0, 0, w, h); ctx.strokeStyle = '#3b82f6'; ctx.lineWidth = 2; ctx.beginPath();
+            
+            let maxVal = 10;
+            for(let i=0; i<graphData.length; i++) if(graphData[i] > maxVal) maxVal = graphData[i];
 
-            // Draw Graph
-            const ctx = graphCtx;
-            const w = graphCanvas.width;
-            const h = graphCanvas.height;
-            
-            ctx.clearRect(0, 0, w, h);
-            ctx.strokeStyle = '#3b82f6'; // Tailwind blue-500
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            
             const step = w / graphData.length;
-            const maxVal = 50; // Fixed scale for stability, or could be dynamic
-            
             for (let i = 0; i < graphData.length; i++) {
-                const x = i * step;
-                // Invert Y because canvas 0 is top
-                const y = h - (graphData[i] / maxVal) * h; 
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
+                const x = i * step; const y = h - (graphData[i] / maxVal) * h; 
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
             }
             ctx.stroke();
         }
 
-        let pingPong = false; // Toggle between A and B
-
+        let pingPong = false;
         function renderLoop() {
             if (!stream || video.paused || video.ended) return;
-
-            // 1. Upload Video Frame
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, textureVideo);
+            gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, textureVideo);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-
-            // 2. Compute Pass (Render to Next state)
-            const sourceFBO = pingPong ? fboB : fboA; 
-            const destFBO = pingPong ? fboA : fboB; 
-            
-            // Source Textures (Prev state)
+            const destFBO = pingPong ? fboA : fboB;
             const tAvgPrev = pingPong ? texAvgB : texAvgA;
             const tFastPrev = pingPong ? texFastB : texFastA;
             const tBurnPrev = pingPong ? texBurnB : texBurnA;
-            
+
             gl.bindFramebuffer(gl.FRAMEBUFFER, destFBO);
-            gl.viewport(0, 0, mainCanvas.width, mainCanvas.height);
             gl.useProgram(programCompute);
-            
-            // Bind Uniforms
             gl.uniform1i(gl.getUniformLocation(programCompute, "u_image"), 0);
-            
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, tAvgPrev);
-            gl.uniform1i(gl.getUniformLocation(programCompute, "u_avg_prev"), 1);
-            
-            gl.activeTexture(gl.TEXTURE2);
-            gl.bindTexture(gl.TEXTURE_2D, tFastPrev);
-            gl.uniform1i(gl.getUniformLocation(programCompute, "u_fast_prev"), 2);
-            
-            gl.activeTexture(gl.TEXTURE3);
-            gl.bindTexture(gl.TEXTURE_2D, tBurnPrev);
-            gl.uniform1i(gl.getUniformLocation(programCompute, "u_burn_prev"), 3);
-            
+            gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tAvgPrev); gl.uniform1i(gl.getUniformLocation(programCompute, "u_avg_prev"), 1);
+            gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, tFastPrev); gl.uniform1i(gl.getUniformLocation(programCompute, "u_fast_prev"), 2);
+            gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, tBurnPrev); gl.uniform1i(gl.getUniformLocation(programCompute, "u_burn_prev"), 3);
             gl.uniform1f(gl.getUniformLocation(programCompute, "u_smooth"), smoothing);
             gl.uniform1f(gl.getUniformLocation(programCompute, "u_noise"), noiseFilter);
             gl.uniform1f(gl.getUniformLocation(programCompute, "u_gain"), gain);
             gl.uniform1f(gl.getUniformLocation(programCompute, "u_persistence"), persistence);
+            gl.uniform1f(gl.getUniformLocation(programCompute, "u_spatial_radius"), spatialRadius);
+            gl.uniform2f(gl.getUniformLocation(programCompute, "u_resolution"), mainCanvas.width, mainCanvas.height);
             gl.uniform1i(gl.getUniformLocation(programCompute, "u_burn_enabled"), isBurnEnabled ? 1 : 0);
-            
-            gl.bindVertexArray(quadVAO);
-            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            gl.bindVertexArray(quadVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-            // 2.5 Extract Data for Graph (Center Pixel from Compute Result)
             updateGraph(destFBO);
 
-            // 3. Display Pass (Render to Screen)
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.useProgram(programDisplay);
-            
-            // Current State Textures (Just written to)
             const tAvgCurr = pingPong ? texAvgA : texAvgB;
             const tFastCurr = pingPong ? texFastA : texFastB;
             const tBurnCurr = pingPong ? texBurnA : texBurnB;
-            
-            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_image"), 0); // Video still at unit 0
-            
-            gl.activeTexture(gl.TEXTURE1);
-            gl.bindTexture(gl.TEXTURE_2D, tAvgCurr);
-            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_avg"), 1);
-            
-            gl.activeTexture(gl.TEXTURE2);
-            gl.bindTexture(gl.TEXTURE_2D, tFastCurr);
-            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_fast"), 2);
-            
-            gl.activeTexture(gl.TEXTURE3);
-            gl.bindTexture(gl.TEXTURE_2D, tBurnCurr);
-            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_burn"), 3);
-            
+            const tSpatialCurr = pingPong ? texSpatialA : texSpatialB;
+            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_image"), 0);
+            gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tAvgCurr); gl.uniform1i(gl.getUniformLocation(programDisplay, "u_avg"), 1);
+            gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, tFastCurr); gl.uniform1i(gl.getUniformLocation(programDisplay, "u_fast"), 2);
+            gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, tBurnCurr); gl.uniform1i(gl.getUniformLocation(programDisplay, "u_burn"), 3);
+            gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, tSpatialCurr); gl.uniform1i(gl.getUniformLocation(programDisplay, "u_spatial_diff"), 4);
             gl.uniform1f(gl.getUniformLocation(programDisplay, "u_gain"), gain);
             gl.uniform1f(gl.getUniformLocation(programDisplay, "u_zoom"), zoomFactor);
             gl.uniform1i(gl.getUniformLocation(programDisplay, "u_mode"), currentModeInt);
             gl.uniform1i(gl.getUniformLocation(programDisplay, "u_burn_enabled"), isBurnEnabled ? 1 : 0);
-            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_show_crosshair"), isGraphEnabled ? 1 : 0); // Show crosshair if graph is enabled
-            
+            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_show_crosshair"), isGraphEnabled ? 1 : 0);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-            // Swap
             pingPong = !pingPong;
             animationId = requestAnimationFrame(renderLoop);
         }
 
-        // Helpers
         function createProgram(gl, vsSource, fsSource) {
             const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
             const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-            const prog = gl.createProgram();
-            gl.attachShader(prog, vs);
-            gl.attachShader(prog, fs);
-            gl.linkProgram(prog);
-            if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-                console.error("Link Error: " + gl.getProgramInfoLog(prog));
-                return null;
-            }
+            const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
             return prog;
         }
-
         function createShader(gl, type, source) {
-            const shader = gl.createShader(type);
-            gl.shaderSource(shader, source);
-            gl.compileShader(shader);
-            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-                console.error("Compile Error: " + gl.getShaderInfoLog(shader));
-                gl.deleteShader(shader);
-                return null;
-            }
+            const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(shader));
             return shader;
         }
 
-        function toggleFullscreen() {
-            const isPseudoFs = container.classList.toggle('pseudo-fullscreen');
-            document.body.classList.toggle('is-fullscreen');
-            fsIcon.innerHTML = isPseudoFs ? 
-                `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />` :
-                `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />`;
-        }
-        
-        fullscreenBtn.addEventListener('click', toggleFullscreen);
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && container.classList.contains('pseudo-fullscreen')) toggleFullscreen();
+        // Recording Logic
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
         });
 
-        // UI Value Updates
-        gainInput.addEventListener('input', (e) => {
-            gain = parseInt(e.target.value);
-            gainVal.textContent = gain + 'x';
+        function startRecording() {
+            const stream = mainCanvas.captureStream(30); // Capture at 30 FPS
+            const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+            let options = { mimeType: '' };
+            
+            for (let type of mimeTypes) {
+                if (MediaRecorder.isTypeSupported(type)) {
+                    options.mimeType = type;
+                    break;
+                }
+            }
+
+            if (!options.mimeType) {
+                alert("Video recording is not supported in this browser.");
+                return;
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                console.error("MediaRecorder creation failed:", e);
+                return;
+            }
+
+            recordedChunks = [];
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = saveVideo;
+            mediaRecorder.start();
+            isRecording = true;
+            
+            // UI Updates
+            recordBtn.classList.add('recording');
+            recIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" fill="currentColor" class="text-red-600" />`; // Stop square
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            // UI Updates
+            recordBtn.classList.remove('recording');
+            recIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /><circle cx="12" cy="12" r="3" fill="currentColor" class="text-red-500" />`;
+        }
+
+        function saveVideo() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `motion-magnifier-${timestamp}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+        }
+
+        fullscreenBtn.addEventListener('click', () => {
+            const isPseudoFs = container.classList.toggle('pseudo-fullscreen');
+            document.body.classList.toggle('is-fullscreen');
+            fsIcon.innerHTML = isPseudoFs ? `<path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round"/>` : `<path d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" stroke-width="2" stroke-linecap="round"/>`;
         });
-        smoothInput.addEventListener('input', (e) => {
-            smoothing = parseInt(e.target.value) / 100;
-            smoothVal.textContent = smoothing.toFixed(2);
-        });
-        noiseInput.addEventListener('input', (e) => {
-            noiseFilter = parseInt(e.target.value) / 100;
-            noiseVal.textContent = noiseFilter.toFixed(2);
-        });
-        zoomInput.addEventListener('input', (e) => {
-            zoomFactor = parseInt(e.target.value) / 10;
-            zoomVal.textContent = zoomFactor.toFixed(1) + 'x';
-        });
-        burnInput.addEventListener('input', (e) => {
-            persistence = parseInt(e.target.value) / 100;
-            burnVal.textContent = persistence.toFixed(2);
-        });
-        burnToggle.addEventListener('change', (e) => {
-            isBurnEnabled = e.target.checked;
-        });
+
+        gainInput.addEventListener('input', (e) => { gain = parseInt(e.target.value); gainVal.textContent = gain + 'x'; });
+        spatialInput.addEventListener('input', (e) => { spatialRadius = parseInt(e.target.value) / 10.0; spatialVal.textContent = spatialRadius.toFixed(1) + 'px'; });
+        smoothInput.addEventListener('input', (e) => { smoothing = parseInt(e.target.value) / 100; smoothVal.textContent = smoothing.toFixed(2); });
+        noiseInput.addEventListener('input', (e) => { noiseFilter = parseInt(e.target.value) / 100; noiseVal.textContent = noiseFilter.toFixed(2); });
+        zoomInput.addEventListener('input', (e) => { zoomFactor = parseInt(e.target.value) / 10; zoomVal.textContent = zoomFactor.toFixed(1) + 'x'; });
+        burnInput.addEventListener('input', (e) => { persistence = parseInt(e.target.value) / 100; burnVal.textContent = persistence.toFixed(2); });
+        burnToggle.addEventListener('change', (e) => isBurnEnabled = e.target.checked);
         graphToggle.addEventListener('change', (e) => {
             isGraphEnabled = e.target.checked;
-            if(isGraphEnabled) {
-                graphContainer.classList.remove('hidden');
-                graphCanvas.width = graphCanvas.offsetWidth;
-                graphCanvas.height = graphCanvas.offsetHeight;
-            } else {
-                graphContainer.classList.add('hidden');
-            }
+            graphContainer.classList.toggle('hidden', !isGraphEnabled);
+            if(isGraphEnabled) { graphCanvas.width = graphCanvas.offsetWidth; graphCanvas.height = graphCanvas.offsetHeight; }
         });
         modeBtns.forEach(btn => {
             btn.addEventListener('click', () => {
-                modeBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const modeStr = btn.dataset.mode;
-                if (modeStr === 'normal') currentModeInt = 0;
-                else if (modeStr === 'amplified') currentModeInt = 1;
-                else if (modeStr === 'motion') currentModeInt = 2;
+                modeBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active');
+                if (btn.dataset.mode === 'normal') currentModeInt = 0; else if (btn.dataset.mode === 'amplified') currentModeInt = 1; else currentModeInt = 2;
             });
         });
     </script>
