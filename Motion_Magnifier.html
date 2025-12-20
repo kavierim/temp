@@ -154,7 +154,8 @@
         body.is-fullscreen header, 
         body.is-fullscreen .controls-panel, 
         body.is-fullscreen footer,
-        body.is-fullscreen .seo-content {
+        body.is-fullscreen .seo-content,
+        body.is-fullscreen #graphContainer {
             opacity: 0;
             pointer-events: none;
         }
@@ -210,7 +211,7 @@
     </header>
 
     <main class="w-full flex flex-col items-center">
-        <div id="container" class="canvas-container group mb-10">
+        <div id="container" class="canvas-container group mb-6">
             <button id="persistentSettingsBtn" class="overlay-btn settings-btn shadow-sm" title="Camera Settings">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -237,6 +238,15 @@
                 </button>
                 <p class="mt-4 text-sm text-slate-400">Setup your device and resolution preferences.</p>
             </div>
+        </div>
+
+        <!-- Graph Container -->
+        <div class="w-full max-w-3xl mb-8 bg-white rounded-2xl shadow-sm border border-slate-100 p-4 hidden" id="graphContainer">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Motion Signal (Center Pixel)</h3>
+                <span class="text-xs font-mono text-blue-500 font-bold" id="graphValue">0.00</span>
+            </div>
+            <canvas id="graphCanvas" class="w-full h-32 rounded-lg bg-slate-50 border border-slate-100"></canvas>
         </div>
 
         <div class="controls-panel w-full max-w-3xl rounded-3xl p-8 grid grid-cols-1 md:grid-cols-2 gap-10 shadow-sm mb-12 transition-opacity duration-300">
@@ -288,6 +298,17 @@
                 </div>
             </div>
 
+            <!-- Graph Toggle -->
+            <div class="space-y-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Show Data Plot</label>
+                    <label class="switch">
+                        <input type="checkbox" id="graphToggle" aria-label="Toggle Data Plotting">
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Persistence Control -->
             <div class="space-y-4">
                 <div class="flex justify-between items-center">
@@ -297,7 +318,7 @@
                 <input type="range" id="burnInput" min="50" max="99" value="95" aria-label="Burn Persistence Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
             </div>
 
-            <div class="space-y-4 flex flex-col justify-end md:col-span-2">
+            <div class="space-y-4 flex flex-col justify-end">
                 <button id="quickSetupBtn" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
                     Change Device / Quality
                 </button>
@@ -338,6 +359,7 @@
                     <h4 class="font-bold text-emerald-600 mb-2 italic">Key Features</h4>
                     <ul class="list-disc ml-5 text-sm space-y-2">
                         <li><strong>GPU Acceleration:</strong> Uses WebGL 2.0 for lag-free processing.</li>
+                        <li><strong>Live Data Plotting:</strong> Graph motion intensity in real-time.</li>
                         <li><strong>Frequency Filtering:</strong> Isolate specific vibration speeds.</li>
                         <li><strong>Motion Burning:</strong> Visualize paths of movement over time.</li>
                         <li><strong>Digital Zoom:</strong> Focus amplification on specific areas.</li>
@@ -426,6 +448,7 @@
         uniform float u_zoom;
         uniform int u_mode; // 0: Normal, 1: Amplified, 2: Motion
         uniform bool u_burn_enabled;
+        uniform bool u_show_crosshair;
 
         in vec2 v_texCoord;
         out vec4 out_color;
@@ -457,6 +480,18 @@
                 if (u_burn_enabled) motion += burn.rgb;
                 color = clamp(motion, 0.0, 1.0);
             }
+
+            // Crosshair overlay
+            if (u_show_crosshair) {
+                // Draw at center (0.5, 0.5)
+                float cx = abs(v_texCoord.x - 0.5);
+                float cy = abs(v_texCoord.y - 0.5);
+                
+                // Cross dimensions (relative to screen space 0-1)
+                if ((cx < 0.002 && cy < 0.03) || (cy < 0.003 && cx < 0.03)) {
+                     color = vec3(1.0, 0.0, 0.0); // Red
+                }
+            }
             
             out_color = vec4(color, 1.0);
         }
@@ -466,6 +501,11 @@
         const video = document.getElementById('videoElement');
         const mainCanvas = document.getElementById('mainCanvas');
         const container = document.getElementById('container');
+        
+        // Graph Elements
+        const graphContainer = document.getElementById('graphContainer');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphValue = document.getElementById('graphValue');
         
         // UI Elements
         const openSetupBtn = document.getElementById('openSetupBtn');
@@ -492,6 +532,7 @@
         const burnInput = document.getElementById('burnInput');
         const burnVal = document.getElementById('burnVal');
         const burnToggle = document.getElementById('burnToggle');
+        const graphToggle = document.getElementById('graphToggle');
         const modeBtns = document.querySelectorAll('.mode-btn');
 
         // WebGL Globals
@@ -505,6 +546,11 @@
         let stream = null;
         let animationId = null;
         let currentModeInt = 1; // 1 = Amplified
+
+        // Graph Globals
+        let graphCtx;
+        let graphData = new Array(300).fill(0);
+        let isGraphEnabled = false;
 
         // Params
         let gain = 15;
@@ -553,7 +599,10 @@
                 alert("WebGL 2.0 not supported. Please use a modern browser.");
                 return false;
             }
-            gl.getExtension("EXT_color_buffer_float"); // Important for floating point textures if needed, though we use regular RGBA8 usually.
+            gl.getExtension("EXT_color_buffer_float"); 
+            
+            // Graph Init
+            graphCtx = graphCanvas.getContext('2d');
             
             // Create Shaders
             const vsSource = document.getElementById('vs').text.trim();
@@ -598,8 +647,6 @@
             const createTex = () => {
                 const tex = gl.createTexture();
                 gl.bindTexture(gl.TEXTURE_2D, tex);
-                // Use RGBA8 (Standard) or RGBA16F (Float) for precision
-                // We'll use standard RGBA for compatibility and speed, usually enough
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -659,6 +706,10 @@
                     gl.viewport(0, 0, w, h);
                     createTexturesAndFBOs(w, h);
                     
+                    // Graph setup
+                    graphCanvas.width = graphCanvas.offsetWidth;
+                    graphCanvas.height = graphCanvas.offsetHeight;
+                    
                     statusOverlay.classList.add('opacity-0');
                     setTimeout(() => statusOverlay.style.display = 'none', 500);
                     
@@ -669,6 +720,62 @@
                 console.error(err);
                 alert("Could not start camera. Check permissions.");
             }
+        }
+
+        function updateGraph(destFBO) {
+            if (!isGraphEnabled) return;
+
+            // Read from the FBO we just wrote to
+            gl.bindFramebuffer(gl.READ_FRAMEBUFFER, destFBO);
+            
+            const centerX = Math.floor(mainCanvas.width / 2);
+            const centerY = Math.floor(mainCanvas.height / 2);
+
+            // Read Average Pixel
+            gl.readBuffer(gl.COLOR_ATTACHMENT0);
+            const pAvg = new Uint8Array(4);
+            gl.readPixels(centerX, centerY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pAvg);
+
+            // Read Fast Pixel
+            gl.readBuffer(gl.COLOR_ATTACHMENT1);
+            const pFast = new Uint8Array(4);
+            gl.readPixels(centerX, centerY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pFast);
+
+            // Calculate Difference Magnitude
+            // Normalize to 0-1 then apply gain for visualization
+            let sumDiff = 0;
+            for(let i=0; i<3; i++) {
+                sumDiff += Math.abs(pFast[i] - pAvg[i]);
+            }
+            // Average the 3 channels, normalize 255, multiply by gain
+            const val = (sumDiff / 3.0 / 255.0) * gain * 100; // *100 for better graph scale
+            
+            // Update Graph UI
+            graphValue.textContent = val.toFixed(2);
+            graphData.shift();
+            graphData.push(val);
+
+            // Draw Graph
+            const ctx = graphCtx;
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            
+            ctx.clearRect(0, 0, w, h);
+            ctx.strokeStyle = '#3b82f6'; // Tailwind blue-500
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            const step = w / graphData.length;
+            const maxVal = 50; // Fixed scale for stability, or could be dynamic
+            
+            for (let i = 0; i < graphData.length; i++) {
+                const x = i * step;
+                // Invert Y because canvas 0 is top
+                const y = h - (graphData[i] / maxVal) * h; 
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
         }
 
         let pingPong = false; // Toggle between A and B
@@ -682,8 +789,8 @@
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
             // 2. Compute Pass (Render to Next state)
-            const sourceFBO = pingPong ? fboB : fboA; // Not strictly used as source, just conceptual
-            const destFBO = pingPong ? fboA : fboB; // We write to this
+            const sourceFBO = pingPong ? fboB : fboA; 
+            const destFBO = pingPong ? fboA : fboB; 
             
             // Source Textures (Prev state)
             const tAvgPrev = pingPong ? texAvgB : texAvgA;
@@ -718,6 +825,9 @@
             gl.bindVertexArray(quadVAO);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
+            // 2.5 Extract Data for Graph (Center Pixel from Compute Result)
+            updateGraph(destFBO);
+
             // 3. Display Pass (Render to Screen)
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.useProgram(programDisplay);
@@ -745,6 +855,7 @@
             gl.uniform1f(gl.getUniformLocation(programDisplay, "u_zoom"), zoomFactor);
             gl.uniform1i(gl.getUniformLocation(programDisplay, "u_mode"), currentModeInt);
             gl.uniform1i(gl.getUniformLocation(programDisplay, "u_burn_enabled"), isBurnEnabled ? 1 : 0);
+            gl.uniform1i(gl.getUniformLocation(programDisplay, "u_show_crosshair"), isGraphEnabled ? 1 : 0); // Show crosshair if graph is enabled
             
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
@@ -816,6 +927,16 @@
         });
         burnToggle.addEventListener('change', (e) => {
             isBurnEnabled = e.target.checked;
+        });
+        graphToggle.addEventListener('change', (e) => {
+            isGraphEnabled = e.target.checked;
+            if(isGraphEnabled) {
+                graphContainer.classList.remove('hidden');
+                graphCanvas.width = graphCanvas.offsetWidth;
+                graphCanvas.height = graphCanvas.offsetHeight;
+            } else {
+                graphContainer.classList.add('hidden');
+            }
         });
         modeBtns.forEach(btn => {
             btn.addEventListener('click', () => {
