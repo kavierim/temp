@@ -207,6 +207,16 @@
                     </select>
                 </div>
 
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Frame Rate</label>
+                    <select id="fpsSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
+                        <option value="60">60 FPS (Smoother)</option>
+                        <option value="30" selected>30 FPS (Standard)</option>
+                        <option value="24">24 FPS (Cinematic)</option>
+                        <option value="15">15 FPS (Low Light)</option>
+                    </select>
+                </div>
+
                 <div class="pt-4 flex gap-3">
                     <button id="cancelSetup" class="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all">Cancel</button>
                     <button id="confirmSetup" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all active:scale-95">Apply Settings</button>
@@ -308,7 +318,7 @@
                     <span id="noiseVal" class="px-2 py-1 bg-teal-100 text-teal-700 rounded-lg font-mono text-sm font-bold">0.10</span>
                 </div>
                 <input type="range" id="noiseInput" min="0" max="90" value="10" aria-label="Noise Filter (High Cut)" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
-                <p class="text-xs text-slate-400 mt-1">Filters out fast sensor noise (High Frequency Cutoff).</p>
+                <p class="text-xs text-slate-400 mt-1">Filters out fast sensor noise (High Frequency Cutoff). Set to 0 for Raw input.</p>
             </div>
 
             <!-- Zoom Control -->
@@ -359,10 +369,11 @@
 
             <div class="space-y-4 md:col-span-2 border-t border-slate-100 pt-6">
                 <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Viewing Mode</label>
-                <div class="flex p-1.5 bg-slate-100/50 rounded-2xl gap-1">
-                    <button data-mode="normal" class="mode-btn flex-1 py-3 rounded-xl text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700">Original</button>
-                    <button data-mode="amplified" class="mode-btn flex-1 py-3 rounded-xl text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700 active">Amplified</button>
-                    <button data-mode="motion" class="mode-btn flex-1 py-3 rounded-xl text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700">Motion Ghost</button>
+                <div class="flex p-1.5 bg-slate-100/50 rounded-2xl gap-1 overflow-x-auto">
+                    <button data-mode="normal" class="mode-btn flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap">Original</button>
+                    <button data-mode="amplified" class="mode-btn flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700 active whitespace-nowrap">Amplified</button>
+                    <button data-mode="pulse" class="mode-btn flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap">Pulse (Color)</button>
+                    <button data-mode="motion" class="mode-btn flex-1 py-3 px-2 rounded-xl text-xs sm:text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700 whitespace-nowrap">Motion Ghost</button>
                 </div>
             </div>
         </div>
@@ -452,10 +463,15 @@
 
             // 1. Temporal Filtering
             vec3 new_avg = prev_avg.rgb * u_smooth + current.rgb * (1.0 - u_smooth);
+            
+            // Calculate Fast Average / Signal
+            // If u_noise is 0.0, this becomes current.rgb (Raw)
+            // If u_noise > 0.0, this acts as a low-pass filter on the signal (Bandpass)
             vec3 new_fast = prev_fast.rgb * u_noise + current.rgb * (1.0 - u_noise);
+            vec3 signal = new_fast;
             
             // 2. Burn Logic (Instantaneous)
-            vec3 raw_diff = new_fast - new_avg;
+            vec3 raw_diff = signal - new_avg;
             vec3 abs_diff = abs(raw_diff);
             vec3 new_burn = vec3(0.0);
             if (u_burn_enabled) {
@@ -472,9 +488,20 @@
                     for(int y = -2; y <= 2; y++) {
                         // Offset scale for sampling
                         vec2 offset = vec2(float(x), float(y)) * u_spatial_radius / 2.0 / u_resolution;
+                        
                         vec3 n_avg = texture(u_avg_prev, v_texCoord + offset).rgb;
-                        vec3 n_fast = texture(u_fast_prev, v_texCoord + offset).rgb;
-                        spatial_diff += (n_fast - n_avg);
+                        
+                        // Calculate neighbor signal correctly based on u_noise setting
+                        vec3 n_prev_fast = texture(u_fast_prev, v_texCoord + offset).rgb;
+                        
+                        // Image texture needs flipped Y coordinate
+                        vec2 img_uv = vec2(v_texCoord.x + offset.x, 1.0 - (v_texCoord.y + offset.y));
+                        vec3 n_cur_img = texture(u_image, img_uv).rgb;
+                        
+                        // Mix neighbor signal just like center pixel
+                        vec3 n_signal = n_prev_fast * u_noise + n_cur_img * (1.0 - u_noise);
+
+                        spatial_diff += (n_signal - n_avg);
                         total_w += 1.0;
                     }
                 }
@@ -502,7 +529,7 @@
 
         uniform float u_gain;
         uniform float u_zoom;
-        uniform int u_mode; // 0: Normal, 1: Amplified, 2: Motion
+        uniform int u_mode; // 0: Normal, 1: Amplified, 2: Motion, 3: Pulse
         uniform bool u_burn_enabled;
         uniform bool u_show_crosshair;
 
@@ -531,6 +558,17 @@
                 vec3 motion = vec3(0.5) + diff * u_gain;
                 if (u_burn_enabled) motion += burn.rgb;
                 color = clamp(motion, 0.0, 1.0);
+            } else if (u_mode == 3) { // Pulse
+                // Pulse Mode: Focus on Green channel (strongest hemoglobin signal)
+                // and visualize as Red flush.
+                // Invert Green signal because blood absorption dims green light.
+                float pulse_signal = -diff.g * u_gain;
+                
+                // Add to Red, subtract from Green/Blue to enhance contrast
+                vec3 pulse_color = current.rgb + vec3(pulse_signal * 1.5, -pulse_signal * 0.5, -pulse_signal * 0.5);
+                
+                if (u_burn_enabled) pulse_color += burn.rgb;
+                color = clamp(pulse_color, 0.0, 1.0);
             }
 
             if (u_show_crosshair) {
@@ -561,6 +599,7 @@
         const confirmSetup = document.getElementById('confirmSetup');
         const cameraSelect = document.getElementById('cameraSelect');
         const resolutionSelect = document.getElementById('resolutionSelect');
+        const fpsSelect = document.getElementById('fpsSelect');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         const recordBtn = document.getElementById('recordBtn');
         const recIcon = document.getElementById('rec-icon');
@@ -605,6 +644,7 @@
         let persistence = 0.95;
         let zoomFactor = 1.0;
         let isBurnEnabled = false;
+        let currentFps = 30;
 
         // Recording Globals
         let mediaRecorder;
@@ -638,8 +678,9 @@
         confirmSetup.addEventListener('click', async () => {
             const deviceId = cameraSelect.value;
             const height = parseInt(resolutionSelect.value);
+            const fps = parseInt(fpsSelect.value);
             setupModal.style.display = 'none';
-            await startCamera(deviceId, height);
+            await startCamera(deviceId, height, fps);
         });
 
         function initWebGL() {
@@ -707,10 +748,18 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
 
-        async function startCamera(deviceId, targetHeight) {
+        async function startCamera(deviceId, targetHeight, targetFps = 30) {
             if (stream) stream.getTracks().forEach(t => t.stop());
+            currentFps = targetFps;
             try {
-                const constraints = { video: { deviceId: deviceId ? { exact: deviceId } : undefined, height: { ideal: targetHeight }, aspectRatio: 4/3 } };
+                const constraints = { 
+                    video: { 
+                        deviceId: deviceId ? { exact: deviceId } : undefined, 
+                        height: { ideal: targetHeight }, 
+                        frameRate: { ideal: targetFps },
+                        aspectRatio: 4/3 
+                    } 
+                };
                 stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 if (!gl && !initWebGL()) return;
@@ -777,6 +826,7 @@
             gl.uniform1f(gl.getUniformLocation(programCompute, "u_spatial_radius"), spatialRadius);
             gl.uniform2f(gl.getUniformLocation(programCompute, "u_resolution"), mainCanvas.width, mainCanvas.height);
             gl.uniform1i(gl.getUniformLocation(programCompute, "u_burn_enabled"), isBurnEnabled ? 1 : 0);
+            
             gl.bindVertexArray(quadVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
             updateGraph(destFBO);
@@ -825,7 +875,7 @@
         });
 
         function startRecording() {
-            const stream = mainCanvas.captureStream(30); // Capture at 30 FPS
+            const stream = mainCanvas.captureStream(currentFps); // Capture at current camera FPS
             const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
             let options = { mimeType: '' };
             
@@ -898,7 +948,9 @@
         gainInput.addEventListener('input', (e) => { gain = parseInt(e.target.value); gainVal.textContent = gain + 'x'; });
         spatialInput.addEventListener('input', (e) => { spatialRadius = parseInt(e.target.value) / 10.0; spatialVal.textContent = spatialRadius.toFixed(1) + 'px'; });
         smoothInput.addEventListener('input', (e) => { smoothing = parseInt(e.target.value) / 100; smoothVal.textContent = smoothing.toFixed(2); });
+        
         noiseInput.addEventListener('input', (e) => { noiseFilter = parseInt(e.target.value) / 100; noiseVal.textContent = noiseFilter.toFixed(2); });
+        
         zoomInput.addEventListener('input', (e) => { zoomFactor = parseInt(e.target.value) / 10; zoomVal.textContent = zoomFactor.toFixed(1) + 'x'; });
         burnInput.addEventListener('input', (e) => { persistence = parseInt(e.target.value) / 100; burnVal.textContent = persistence.toFixed(2); });
         burnToggle.addEventListener('change', (e) => isBurnEnabled = e.target.checked);
@@ -910,7 +962,11 @@
         modeBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 modeBtns.forEach(b => b.classList.remove('active')); btn.classList.add('active');
-                if (btn.dataset.mode === 'normal') currentModeInt = 0; else if (btn.dataset.mode === 'amplified') currentModeInt = 1; else currentModeInt = 2;
+                const m = btn.dataset.mode;
+                if (m === 'normal') currentModeInt = 0; 
+                else if (m === 'amplified') currentModeInt = 1; 
+                else if (m === 'motion') currentModeInt = 2;
+                else if (m === 'pulse') currentModeInt = 3;
             });
         });
     </script>
