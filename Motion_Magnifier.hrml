@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>Motion Magnifier - Real-Time Webcam Motion Amplification Tool</title>
+    <meta name="description" content="A powerful, browser-based motion magnification tool. Amplify invisible vibrations and sub-pixel movements in real-time using your webcam. Based on Eulerian Video Magnification principles.">
+    <meta name="keywords" content="motion magnification, Eulerian Video Magnification, webcam motion amplifier, vibration detection, sub-pixel motion, real-time video processing, Steve Mould motion amplification">
+    <meta name="author" content="Motion Magnifier Project">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://kavierim.github.io/temp/Motion_Magnifier.hrml">
+    <meta property="og:title" content="Motion Magnifier - See the Invisible">
+    <meta property="og:description" content="Amplify tiny movements and vibrations in real-time using your browser. Perfect for seeing heart rates, structural vibrations, and more.">
+    <meta property="og:image" content="https://kavierim.github.io/temp/preview-image.jpg">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:title" content="Motion Magnifier - See the Invisible">
+    <meta property="twitter:description" content="Real-time webcam motion amplification based on Eulerian Video Magnification.">
+
+    <!-- Structured Data (JSON-LD) for Google -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Motion Magnifier",
+      "operatingSystem": "Web Browser",
+      "applicationCategory": "MultimediaApplication",
+      "description": "Amplify tiny movements and vibrations in real-time using a webcam and Eulerian Video Magnification algorithms.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #1e293b;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 4/3;
+            background: #ffffff;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+        }
+
+        /* Pseudo-Fullscreen styles */
+        .canvas-container.pseudo-fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            max-width: none;
+            aspect-ratio: auto;
+            border-radius: 0;
+            border: none;
+            z-index: 9999;
+            background: black;
+        }
+        
+        .canvas-container.pseudo-fullscreen canvas {
+            object-fit: contain;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .controls-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+        }
+        input[type="range"] {
+            accent-color: #2563eb;
+        }
+        /* Active button state */
+        .mode-btn.active {
+            border-color: #2563eb !important;
+            background-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+        }
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider-toggle {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider-toggle:before {
+            position: absolute;
+            content: "";
+            height: 18px; width: 18px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider-toggle { background-color: #2563eb; }
+        input:checked + .slider-toggle:before { transform: translateX(20px); }
+
+        .overlay-btn {
+            position: absolute;
+            top: 1rem;
+            z-index: 10000;
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(4px);
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            color: #475569;
+            transition: all 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+        .overlay-btn:hover {
+            background: #fff;
+            color: #2563eb;
+            transform: scale(1.05);
+        }
+        
+        .fullscreen-btn { right: 1rem; }
+        .settings-btn { right: 4rem; }
+        
+        body.is-fullscreen header, 
+        body.is-fullscreen .controls-panel, 
+        body.is-fullscreen footer,
+        body.is-fullscreen .seo-content {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Modal Overlay */
+        #setupModal {
+            display: none;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 md:p-8">
+
+    <!-- Setup Modal -->
+    <div id="setupModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 border border-slate-100 transform transition-all">
+            <h2 class="text-2xl font-bold text-slate-900 mb-2">Camera Setup</h2>
+            <p class="text-slate-500 mb-6 text-sm">Choose your device and quality settings.</p>
+            
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Device</label>
+                    <select id="cameraSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
+                        <option value="">Loading devices...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Resolution</label>
+                    <select id="resolutionSelect" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm">
+                        <option value="480">Standard (480p) - Faster</option>
+                        <option value="720" selected>High Definition (720p)</option>
+                        <option value="1080">Full HD (1080p) - Heavy</option>
+                    </select>
+                </div>
+
+                <div class="pt-4 flex gap-3">
+                    <button id="cancelSetup" class="flex-1 px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-sm transition-all">Cancel</button>
+                    <button id="confirmSetup" class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all active:scale-95">Apply Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <header class="text-center mb-10 transition-opacity duration-300">
+        <h1 class="text-4xl font-extrabold mb-3 tracking-tight text-slate-900">
+            Real-Time Motion <span class="text-blue-600">Magnifier</span>
+        </h1>
+        <p class="text-slate-500 max-w-md mx-auto text-lg">
+            Amplify invisible vibrations and sub-pixel movements directly in your browser.
+        </p>
+    </header>
+
+    <main class="w-full flex flex-col items-center">
+        <div id="container" class="canvas-container group mb-10">
+            <button id="persistentSettingsBtn" class="overlay-btn settings-btn shadow-sm" title="Camera Settings">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+
+            <button id="fullscreenBtn" class="overlay-btn fullscreen-btn shadow-sm" title="Toggle Fullscreen">
+                <svg id="fs-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+            </button>
+            
+            <canvas id="mainCanvas"></canvas>
+            
+            <div id="statusOverlay" class="absolute inset-0 flex flex-col items-center justify-center bg-white/90 transition-opacity duration-500 z-20">
+                <div class="p-4 rounded-full bg-blue-50 mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <button id="openSetupBtn" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold shadow-xl shadow-blue-200 transition-all active:scale-95 transform">
+                    Configure Camera
+                </button>
+                <p class="mt-4 text-sm text-slate-400">Setup your device and resolution preferences.</p>
+            </div>
+        </div>
+
+        <div class="controls-panel w-full max-w-3xl rounded-3xl p-8 grid grid-cols-1 md:grid-cols-2 gap-10 shadow-sm mb-12 transition-opacity duration-300">
+            <!-- Gain Control -->
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Amplification</label>
+                    <span id="gainVal" class="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg font-mono text-sm font-bold">15x</span>
+                </div>
+                <input type="range" id="gainInput" min="1" max="100" value="15" aria-label="Gain Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <!-- Frequency Filters Block -->
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Smoothing (Ref)</label>
+                    <span id="smoothVal" class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg font-mono text-sm font-bold">0.85</span>
+                </div>
+                <input type="range" id="smoothInput" min="0" max="99" value="85" aria-label="Smoothing (Low Cut)" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-xs text-slate-400 mt-1">Filters out background motion (Low Frequency Cutoff).</p>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Noise Filter</label>
+                    <span id="noiseVal" class="px-2 py-1 bg-teal-100 text-teal-700 rounded-lg font-mono text-sm font-bold">0.10</span>
+                </div>
+                <input type="range" id="noiseInput" min="0" max="90" value="10" aria-label="Noise Filter (High Cut)" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-xs text-slate-400 mt-1">Filters out fast sensor noise (High Frequency Cutoff).</p>
+            </div>
+
+            <!-- Zoom Control -->
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Digital Zoom</label>
+                    <span id="zoomVal" class="px-2 py-1 bg-violet-100 text-violet-700 rounded-lg font-mono text-sm font-bold">1.0x</span>
+                </div>
+                <input type="range" id="zoomInput" min="10" max="40" value="10" aria-label="Zoom Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <!-- Burn Motion Control -->
+            <div class="space-y-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Burn Motion</label>
+                    <label class="switch">
+                        <input type="checkbox" id="burnToggle" aria-label="Toggle Motion Burning">
+                        <span class="slider-toggle"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Persistence Control -->
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Persistence</label>
+                    <span id="burnVal" class="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg font-mono text-sm font-bold">0.95</span>
+                </div>
+                <input type="range" id="burnInput" min="50" max="99" value="95" aria-label="Burn Persistence Control" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <div class="space-y-4 flex flex-col justify-end md:col-span-2">
+                <button id="quickSetupBtn" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
+                    Change Device / Quality
+                </button>
+            </div>
+
+            <div class="space-y-4 md:col-span-2 border-t border-slate-100 pt-6">
+                <label class="text-sm font-bold text-slate-700 uppercase tracking-wider">Viewing Mode</label>
+                <div class="flex p-1.5 bg-slate-100/50 rounded-2xl gap-1">
+                    <button data-mode="normal" class="mode-btn flex-1 py-3 rounded-xl text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700">Original</button>
+                    <button data-mode="amplified" class="mode-btn flex-1 py-3 rounded-xl text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700 active">Amplified</button>
+                    <button data-mode="motion" class="mode-btn flex-1 py-3 rounded-xl text-sm font-semibold transition-all border-2 border-transparent text-slate-500 hover:text-slate-700">Motion Ghost</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEO Content Section -->
+        <section class="seo-content max-w-3xl w-full px-4 mb-20 text-slate-600 leading-relaxed transition-opacity duration-300">
+            <h2 class="text-2xl font-bold text-slate-900 mb-6">What is Motion Magnification?</h2>
+            <p class="mb-4">
+                Motion Magnification is a powerful computer vision technique that allows us to see tiny, often invisible movements in video. By analyzing sub-pixel changes over time, we can amplify specific frequencies of movement, revealing things like a person's pulse, the subtle sway of a building, or the vibrations of an engine.
+            </p>
+            
+            <h3 class="text-xl font-bold text-slate-900 mb-4 mt-8">How This Tool Works</h3>
+            <p class="mb-4">
+                This application implements a real-time version of <strong>Eulerian Video Magnification</strong>. Unlike traditional "feature tracking" which follows specific objects, Eulerian methods look at pixels as a fixed grid. By comparing current frames with a temporal average (smoothing), we isolate the "motion signal" and multiply it (gain) before rendering it back onto the screen.
+            </p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h4 class="font-bold text-blue-600 mb-2 italic">Scientific Use Cases</h4>
+                    <ul class="list-disc ml-5 text-sm space-y-2">
+                        <li><strong>Biometrics:</strong> Detecting heart rates through skin color changes and micro-movements.</li>
+                        <li><strong>Structural Engineering:</strong> Identifying resonant frequencies in bridges or cranes.</li>
+                        <li><strong>Mechanical Maintenance:</strong> Troubleshooting imbalanced rotors or vibrating machinery.</li>
+                    </ul>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <h4 class="font-bold text-emerald-600 mb-2 italic">Key Features</h4>
+                    <ul class="list-disc ml-5 text-sm space-y-2">
+                        <li><strong>Frequency Filtering:</strong> Isolate specific vibration speeds using the Smoothing and Noise Filter controls.</li>
+                        <li><strong>Motion Burning:</strong> Visualize paths of movement over time with custom persistence.</li>
+                        <li><strong>Digital Zoom:</strong> Focus amplification on specific areas of interest.</li>
+                        <li><strong>Multi-Device Support:</strong> Switch between internal and external USB webcams.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="text-slate-400 text-sm text-center mb-10 transition-opacity duration-300">
+        <p>&copy; 2025 Motion Magnifier Project. Inspired by Eulerian Video Magnification research.</p>
+    </footer>
+
+    <video id="videoElement" class="hidden" autoplay playsinline></video>
+    <canvas id="bufferCanvas" class="hidden"></canvas>
+    <canvas id="resultCanvas" class="hidden"></canvas>
+
+    <script>
+        const video = document.getElementById('videoElement');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const bufferCanvas = document.getElementById('bufferCanvas');
+        const resultCanvas = document.getElementById('resultCanvas');
+        const container = document.getElementById('container');
+        
+        const openSetupBtn = document.getElementById('openSetupBtn');
+        const quickSetupBtn = document.getElementById('quickSetupBtn');
+        const persistentSettingsBtn = document.getElementById('persistentSettingsBtn');
+        const setupModal = document.getElementById('setupModal');
+        const cancelSetup = document.getElementById('cancelSetup');
+        const confirmSetup = document.getElementById('confirmSetup');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const resolutionSelect = document.getElementById('resolutionSelect');
+        
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const fsIcon = document.getElementById('fs-icon');
+        const statusOverlay = document.getElementById('statusOverlay');
+        
+        const gainInput = document.getElementById('gainInput');
+        const gainVal = document.getElementById('gainVal');
+        const smoothInput = document.getElementById('smoothInput');
+        const smoothVal = document.getElementById('smoothVal');
+        const noiseInput = document.getElementById('noiseInput');
+        const noiseVal = document.getElementById('noiseVal');
+        const zoomInput = document.getElementById('zoomInput');
+        const zoomVal = document.getElementById('zoomVal');
+        const burnInput = document.getElementById('burnInput');
+        const burnVal = document.getElementById('burnVal');
+        const burnToggle = document.getElementById('burnToggle');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+
+        const ctx = mainCanvas.getContext('2d', { alpha: false });
+        const bCtx = bufferCanvas.getContext('2d', { alpha: false });
+        const rCtx = resultCanvas.getContext('2d', { alpha: false });
+
+        let stream = null;
+        let averageFrame = null; 
+        let fastFrame = null; // High-Cut Filter buffer
+        let burnBuffer = null; 
+        let animationId = null;
+        let currentMode = 'amplified';
+
+        let gain = 15;
+        let smoothing = 0.85; // Low-Cut Alpha
+        let noiseFilter = 0.10; // High-Cut Alpha
+        let persistence = 0.95;
+        let zoomFactor = 1.0;
+        let isBurnEnabled = false;
+
+        const showSetup = async () => {
+            setupModal.style.display = 'flex';
+            await loadDevices();
+        };
+
+        openSetupBtn.addEventListener('click', showSetup);
+        quickSetupBtn.addEventListener('click', showSetup);
+        persistentSettingsBtn.addEventListener('click', showSetup);
+
+        cancelSetup.addEventListener('click', () => {
+            setupModal.style.display = 'none';
+        });
+
+        async function loadDevices() {
+            try {
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                tempStream.getTracks().forEach(track => track.stop());
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                cameraSelect.innerHTML = videoDevices.map(device => 
+                    `<option value="${device.deviceId}">${device.label || 'Camera ' + (cameraSelect.length + 1)}</option>`
+                ).join('');
+            } catch (err) {
+                cameraSelect.innerHTML = `<option value="">Camera access denied</option>`;
+            }
+        }
+
+        confirmSetup.addEventListener('click', async () => {
+            const deviceId = cameraSelect.value;
+            const height = parseInt(resolutionSelect.value);
+            setupModal.style.display = 'none';
+            await startCamera(deviceId, height);
+        });
+
+        async function startCamera(deviceId, targetHeight) {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+
+            try {
+                const constraints = {
+                    video: { 
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        height: { ideal: targetHeight },
+                        aspectRatio: 4/3
+                    }
+                };
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    const w = video.videoWidth;
+                    const h = video.videoHeight;
+                    mainCanvas.width = w;
+                    mainCanvas.height = h;
+                    bufferCanvas.width = w;
+                    bufferCanvas.height = h;
+                    resultCanvas.width = w;
+                    resultCanvas.height = h;
+                    averageFrame = null;
+                    fastFrame = null;
+                    statusOverlay.classList.add('opacity-0');
+                    setTimeout(() => statusOverlay.style.display = 'none', 500);
+                    if (animationId) cancelAnimationFrame(animationId);
+                    requestAnimationFrame(processFrame);
+                };
+            } catch (err) {
+                showError("Could not start camera. Check permissions.");
+            }
+        }
+
+        function showError(msg) {
+            const errorBox = document.createElement('div');
+            errorBox.className = "fixed top-8 left-1/2 -translate-x-1/2 bg-white text-red-600 px-6 py-4 rounded-2xl shadow-2xl border border-red-100 z-[10001] font-bold flex items-center gap-3";
+            errorBox.innerHTML = `<span>${msg}</span>`;
+            document.body.appendChild(errorBox);
+            setTimeout(() => errorBox.remove(), 4000);
+        }
+
+        function toggleFullscreen() {
+            const isPseudoFs = container.classList.toggle('pseudo-fullscreen');
+            document.body.classList.toggle('is-fullscreen');
+            fsIcon.innerHTML = isPseudoFs ? 
+                `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />` :
+                `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />`;
+        }
+
+        function processFrame() {
+            if (!stream || video.paused || video.ended) return;
+
+            bCtx.drawImage(video, 0, 0, bufferCanvas.width, bufferCanvas.height);
+            const currentImageData = bCtx.getImageData(0, 0, bufferCanvas.width, bufferCanvas.height);
+            const data = currentImageData.data;
+            const len = data.length;
+
+            if (!averageFrame) {
+                averageFrame = new Float32Array(len);
+                fastFrame = new Float32Array(len);
+                burnBuffer = new Float32Array(len);
+                for (let i = 0; i < len; i++) {
+                    averageFrame[i] = data[i];
+                    fastFrame[i] = data[i];
+                    burnBuffer[i] = 0;
+                }
+            }
+
+            const outputImageData = rCtx.createImageData(resultCanvas.width, resultCanvas.height);
+            const outData = outputImageData.data;
+
+            for (let i = 0; i < len; i += 4) {
+                for (let j = 0; j < 3; j++) {
+                    const idx = i + j;
+                    
+                    // 1. Slow Average (Reference - High Alpha)
+                    // Tracks the "Background" or "DC offset"
+                    averageFrame[idx] = averageFrame[idx] * smoothing + data[idx] * (1 - smoothing);
+                    
+                    // 2. Fast Average (Signal - Low Alpha)
+                    // Tracks the "Signal" but smooths out high-frequency noise
+                    fastFrame[idx] = fastFrame[idx] * noiseFilter + data[idx] * (1 - noiseFilter);
+
+                    // 3. Bandpass Difference
+                    // Subtraction removes the DC offset (background).
+                    // Using fastFrame instead of raw data removes the high-frequency noise.
+                    let diff = fastFrame[idx] - averageFrame[idx];
+                    let absDiff = Math.abs(diff);
+
+                    if (isBurnEnabled) {
+                        burnBuffer[idx] = Math.max(burnBuffer[idx] * persistence, absDiff * gain);
+                    } else {
+                        burnBuffer[idx] = 0;
+                    }
+
+                    if (currentMode === 'normal') {
+                        outData[idx] = Math.min(255, data[idx] + burnBuffer[idx]);
+                    } else if (currentMode === 'amplified') {
+                        let amplifiedVal = data[idx] + (diff * gain);
+                        outData[idx] = Math.min(255, Math.max(0, amplifiedVal + (isBurnEnabled ? burnBuffer[idx] : 0)));
+                    } else if (currentMode === 'motion') {
+                        outData[idx] = Math.min(255, Math.max(0, 128 + (diff * gain) + (isBurnEnabled ? burnBuffer[idx] : 0)));
+                    }
+                }
+                outData[i + 3] = 255;
+            }
+            rCtx.putImageData(outputImageData, 0, 0);
+
+            const w = mainCanvas.width;
+            const h = mainCanvas.height;
+            const sW = w / zoomFactor;
+            const sH = h / zoomFactor;
+            const sX = (w - sW) / 2;
+            const sY = (h - sH) / 2;
+
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(resultCanvas, sX, sY, sW, sH, 0, 0, w, h);
+            animationId = requestAnimationFrame(processFrame);
+        }
+
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && container.classList.contains('pseudo-fullscreen')) toggleFullscreen();
+        });
+
+        gainInput.addEventListener('input', (e) => {
+            gain = parseInt(e.target.value);
+            gainVal.textContent = gain + 'x';
+        });
+        smoothInput.addEventListener('input', (e) => {
+            smoothing = parseInt(e.target.value) / 100;
+            smoothVal.textContent = smoothing.toFixed(2);
+        });
+        noiseInput.addEventListener('input', (e) => {
+            noiseFilter = parseInt(e.target.value) / 100;
+            noiseVal.textContent = noiseFilter.toFixed(2);
+        });
+        zoomInput.addEventListener('input', (e) => {
+            zoomFactor = parseInt(e.target.value) / 10;
+            zoomVal.textContent = zoomFactor.toFixed(1) + 'x';
+        });
+        burnInput.addEventListener('input', (e) => {
+            persistence = parseInt(e.target.value) / 100;
+            burnVal.textContent = persistence.toFixed(2);
+        });
+        burnToggle.addEventListener('change', (e) => {
+            isBurnEnabled = e.target.checked;
+        });
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                modeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentMode = btn.dataset.mode;
+            });
+        });
+    </script>
+</body>
+</html>
