@@ -8,7 +8,7 @@ This repository contains various small code trials and experiments. It serves as
 - [PyScript Example](https://kavierim.github.io/temp/PyScript.html): A demonstration of running Python in the browser using PyScript
 - [Maastokartta](https://kavierim.github.io/temp/maastokartta.html): A topographic map visualization project
 - [Video-Audio Loop-Merger](https://kavierim.github.io/temp/VideoLooper.html): Loop a video for the full duration of an audio track. Runs 100% in your browser.
- - [Motion Magnifier](https://kavierim.github.io/temp/Motion_Magnifier.hrml): Real-time webcam motion magnification tool (Eulerian Video Magnification) that amplifies sub-pixel movements and vibrations in the browser.
+ - [Motion Magnifier](https://kavierim.github.io/temp/Motion_Magnifier.html): Real-time webcam motion magnification tool (Eulerian Video Magnification) that amplifies sub-pixel movements and vibrations in the browser.
 - [Last Frame Extractor](https://kavierim.github.io/temp/LastFrameExtractor.html): Extract the last frame of a video as an image. Runs 100% in your browser.
 - [Chatbot](https://kavierim.github.io/temp/Chatbot.html): A browser-based chatbot using Transformers.js.
 - [Image to HTML Generator](https://kavierim.github.io/temp/Image2HTML.html): Convert an image into an HTML page using a local model. Runs 100% in your browser.
@@ -26,17 +26,8 @@ https://kavierim.github.io/temp/[filename].html
 
 For example:
 
-- https://kavierim.github.io/temp/FluidSimulation.html
-- https://kavierim.github.io/temp/PyScript.html
-- https://kavierim.github.io/temp/maastokartta.html
-- https://kavierim.github.io/temp/VideoLooper.html
-- https://kavierim.github.io/temp/LastFrameExtractor.html
-- https://kavierim.github.io/temp/Chatbot.html
-- https://kavierim.github.io/temp/Image2HTML.html
-- https://kavierim.github.io/temp/TextToSpeech.html
 - https://kavierim.github.io/temp/Viikkokalenteri.html
-- https://kavierim.github.io/temp/PDFConverter.html
- - https://kavierim.github.io/temp/Motion_Magnifier.html
+
 
 ## Contributing
 
