@@ -36,7 +36,7 @@ For example:
 - https://kavierim.github.io/temp/TextToSpeech.html
 - https://kavierim.github.io/temp/Viikkokalenteri.html
 - https://kavierim.github.io/temp/PDFConverter.html
- - https://kavierim.github.io/temp/Motion_Magnifier.hrml
+ - https://kavierim.github.io/temp/Motion_Magnifier.html
 
 ## Contributing
 
