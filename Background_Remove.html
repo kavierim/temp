@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags -->
+    <title>WebAI Background Remover | Free In-Browser AI Tool</title>
+    <meta name="description" content="Remove image backgrounds instantly and for free directly in your browser using local AI (RMBG-1.4). 100% private, no server uploads required.">
+    <meta name="keywords" content="background remover, remove background ai, free background remover, client-side ai, transformers.js, rmbg-1.4, remove bg, browser ai tool">
+    <meta name="author" content="kavierim">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://kavierim.github.io/temp/Background_Remove.html">
+
+    <!-- Favicon (Data URI for performance) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>">
+
+    <!-- Web App Manifest (Data URI) -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"WebAI Remover","short_name":"BG Remover","start_url":".","display":"standalone","background_color":"#ffffff","theme_color":"#4F46E5","icons":[{"src":"data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>","sizes":"192x192","type":"image/svg+xml"}]}'>
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://kavierim.github.io/temp/Background_Remove.html">
+    <meta property="og:title" content="WebAI Background Remover | Free In-Browser AI Tool">
+    <meta property="og:description" content="Remove image backgrounds instantly and for free directly in your browser using local AI. 100% private, no server uploads.">
+    <meta property="og:image" content="https://kavierim.github.io/temp/og-image.png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://kavierim.github.io/temp/Background_Remove.html">
+    <meta property="twitter:title" content="WebAI Background Remover | Free In-Browser AI Tool">
+    <meta property="twitter:description" content="Remove image backgrounds instantly and for free directly in your browser using local AI. 100% private.">
+    <meta property="twitter:image" content="https://kavierim.github.io/temp/og-image.png">
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "WebAI Background Remover",
+      "url": "https://kavierim.github.io/temp/Background_Remove.html",
+      "description": "Free in-browser tool to remove image backgrounds instantly using local AI (RMBG-1.4). Privacy-focused: no data leaves your device.",
+      "applicationCategory": "MultimediaApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "kavierim"
+      },
+      "browserRequirements": "Requires a modern browser with WebAssembly support (Chrome, Edge, Firefox, Safari)."
+    }
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#10B981',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom checkerboard pattern for transparency */
+        .checkerboard {
+            background-color: #ffffff;
+            background-image: linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
+                              linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
+                              linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
+                              linear-gradient(-45deg, transparent 75%, #f3f4f6 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Loading spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #4F46E5;
+            width: 24px;
+            height: 24px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col items-center justify-center p-6 relative">
+        
+        <!-- Background Elements -->
+        <div class="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            <div class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-blue-100 rounded-full blur-3xl opacity-50"></div>
+            <div class="absolute top-[40%] -right-[10%] w-[40%] h-[40%] bg-purple-100 rounded-full blur-3xl opacity-50"></div>
+        </div>
+
+        <div class="w-full max-w-5xl z-10 flex flex-col gap-8">
+            
+            <!-- Header Text -->
+            <div class="text-center space-y-3 mb-4">
+                <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">
+                    Remove Backgrounds <span class="text-primary">Instantly</span>
+                </h1>
+                <p class="text-lg text-slate-600 max-w-2xl mx-auto">
+                    Drag and drop an image below. All processing happens 100% in your browser using local AI models. No data leaves your device.
+                </p>
+            </div>
+
+            <!-- App Container -->
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+                
+                <!-- Model Selection Bar -->
+                <div class="bg-slate-50 border-b border-slate-200 px-6 py-3 flex justify-end items-center">
+                    <label for="model-select" class="text-sm font-medium text-slate-600 mr-2">AI Model:</label>
+                    <select id="model-select" class="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2">
+                        <option value="briaai/RMBG-1.4" selected>RMBG-1.4 (Best Quality)</option>
+                        <option value="Xenova/modnet">ModNet (Faster)</option>
+                    </select>
+                </div>
+
+                <!-- Drop Zone -->
+                <div id="drop-zone" class="relative group p-12 border-b border-slate-100 transition-all duration-300 hover:bg-slate-50 cursor-pointer">
+                    <input type="file" id="file-upload" class="hidden" accept="image/*">
+                    <div class="flex flex-col items-center justify-center gap-4">
+                        <div class="w-20 h-20 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300">
+                            <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xl font-semibold text-slate-800">Click or Drag & Drop Image</p>
+                            <p class="text-slate-500 mt-1">Supports JPG, PNG, WEBP</p>
+                        </div>
+                        <button class="mt-4 px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg shadow-sm shadow-primary/30 transition-all">
+                            Select Image
+                        </button>
+                    </div>
+                    
+                    <!-- Loading Overlay -->
+                    <div id="loading-overlay" class="absolute inset-0 bg-white/90 backdrop-blur-sm z-20 flex flex-col items-center justify-center hidden">
+                        <div class="loader mb-4"></div>
+                        <p id="loading-text" class="text-slate-700 font-medium animate-pulse">Loading AI Model...</p>
+                        <p class="text-xs text-slate-400 mt-2">First run may take a moment</p>
+                    </div>
+                </div>
+
+                <!-- Results Area -->
+                <div id="results-area" class="hidden grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 bg-slate-50/50">
+                    
+                    <!-- Original -->
+                    <div class="p-6 flex flex-col items-center">
+                        <div class="w-full flex justify-between items-center mb-4">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Original</span>
+                            <span id="original-dims" class="text-xs text-slate-400"></span>
+                        </div>
+                        <div class="relative w-full aspect-square rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white flex items-center justify-center">
+                            <img id="original-image" class="max-w-full max-h-full object-contain" src="" alt="Original">
+                        </div>
+                    </div>
+
+                    <!-- Processed -->
+                    <div class="p-6 flex flex-col items-center">
+                        <div class="w-full flex justify-between items-center mb-4">
+                            <span class="text-xs font-bold uppercase tracking-wider text-green-600">Background Removed</span>
+                            <span id="process-time" class="text-xs text-green-600"></span>
+                        </div>
+                        <div class="checkerboard relative w-full aspect-square rounded-lg overflow-hidden border border-slate-200 shadow-sm flex items-center justify-center">
+                            <canvas id="output-canvas" class="max-w-full max-h-full object-contain"></canvas>
+                        </div>
+                        <div class="w-full mt-6 grid grid-cols-2 gap-3">
+                            <button id="reset-btn" class="w-full py-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors">
+                                Start Over
+                            </button>
+                            <button id="download-btn" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Download
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+            <p class="text-center text-xs text-slate-400">
+                Note: Performance depends on your device's GPU capabilities. <br>
+                Model Licenses: RMBG-1.4 (CC-BY-NC-SA 4.0), ModNet (Apache 2.0)
+            </p>
+        </div>
+    </main>
+
+    <!-- Transformers.js Logic -->
+    <script type="module">
+        import { env, AutoModel, AutoProcessor, RawImage } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+        // Configuration
+        env.allowLocalModels = false;
+        
+        // Default Model
+        let MODEL_ID = 'briaai/RMBG-1.4'; 
+        
+        // UI Elements
+        const modelSelect = document.getElementById('model-select');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-upload');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const loadingText = document.getElementById('loading-text');
+        const resultsArea = document.getElementById('results-area');
+        const originalImage = document.getElementById('original-image');
+        const outputCanvas = document.getElementById('output-canvas');
+        const downloadBtn = document.getElementById('download-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const originalDims = document.getElementById('original-dims');
+        const processTime = document.getElementById('process-time');
+
+        let model = null;
+        let processor = null;
+
+        // --- Event Listeners ---
+
+        // Handle Model Change
+        modelSelect.addEventListener('change', (e) => {
+            MODEL_ID = e.target.value;
+            // Reset loaded model so it re-downloads/re-initializes on next use
+            model = null;
+            processor = null;
+            console.log(`Switched to ${MODEL_ID}`);
+        });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('bg-blue-50', 'border-blue-300');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('bg-blue-50', 'border-blue-300');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('bg-blue-50', 'border-blue-300');
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'removed-bg.png';
+            link.href = outputCanvas.toDataURL('image/png');
+            link.click();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            resultsArea.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+            fileInput.value = ''; // Reset input so same file can be selected again
+            
+            // Clear canvas and image to save memory
+            originalImage.src = '';
+            const ctx = outputCanvas.getContext('2d');
+            ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        });
+
+        // --- Core Logic ---
+
+        async function loadModel() {
+            if (model && processor) return true; // Already loaded
+
+            loadingOverlay.classList.remove('hidden');
+            const modelNameDisplay = MODEL_ID.includes('RMBG') ? 'RMBG-1.4' : 'ModNet';
+            loadingText.textContent = `Downloading ${modelNameDisplay} Model...`;
+
+            try {
+                // Initialize model and processor
+                model = await AutoModel.from_pretrained(MODEL_ID);
+                processor = await AutoProcessor.from_pretrained(MODEL_ID);
+                return true;
+            } catch (err) {
+                console.error("Model Loading Error:", err);
+                loadingOverlay.classList.add('hidden');
+                
+                if (err.message.includes("403") || err.message.includes("Unauthorized")) {
+                    alert("Access Denied: The selected model is restricted. Please try switching to ModNet.");
+                } else {
+                    alert("Failed to load model. Check your internet connection.");
+                }
+                return false;
+            }
+        }
+
+        async function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please upload an image file.');
+                return;
+            }
+
+            // 1. Show Loading UI
+            resultsArea.classList.add('hidden');
+            dropZone.classList.add('hidden'); // Hide dropzone too
+            loadingOverlay.classList.remove('hidden');
+            
+            // 2. Load Model if needed
+            const loaded = await loadModel();
+            if (!loaded) {
+                dropZone.classList.remove('hidden'); // Show dropzone again on fail
+                return; 
+            }
+
+            loadingText.textContent = "Processing image...";
+            const startTime = performance.now();
+
+            try {
+                // 3. Read and Display Original
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    originalImage.src = e.target.result;
+                    
+                    try {
+                        // Safety check
+                        if (!model || !processor) throw new Error("Model not initialized");
+
+                        // Convert to RawImage for Transformers.js
+                        const image = await RawImage.fromURL(e.target.result);
+                        
+                        originalDims.textContent = `${image.width} x ${image.height}px`;
+                        
+                        // Update canvas size
+                        outputCanvas.width = image.width;
+                        outputCanvas.height = image.height;
+
+                        // 4. Run AI Inference
+                        // Pre-process image
+                        const { pixel_values } = await processor(image);
+                        
+                        // Run model
+                        const { output } = await model({ input: pixel_values });
+                        
+                        // 5. Post-process (Mask Application)
+                        // The output from RMBG is usually a matte/mask
+                        // We need to resize the mask back to original size
+                        const mask = await RawImage.fromTensor(output[0].mul(255).to('uint8')).resize(image.width, image.height);
+
+                        // Composite on Canvas
+                        const ctx = outputCanvas.getContext('2d');
+                        
+                        // Draw original
+                        ctx.drawImage(image.toCanvas(), 0, 0);
+                        
+                        // Get raw pixel data
+                        const pixelData = ctx.getImageData(0, 0, image.width, image.height);
+                        
+                        // Apply mask to alpha channel
+                        for (let i = 0; i < mask.data.length; i++) {
+                            // pixelData is RGBA (4 bytes per pixel)
+                            // mask.data is usually single channel (1 byte per pixel) or 3.
+                            const alpha = mask.data[i];
+                            pixelData.data[i * 4 + 3] = alpha; // Set Alpha channel
+                        }
+                        
+                        // Put modified data back
+                        ctx.putImageData(pixelData, 0, 0);
+
+                        // 6. Finalize UI
+                        const endTime = performance.now();
+                        processTime.textContent = `Done in ${((endTime - startTime) / 1000).toFixed(2)}s`;
+                        
+                        loadingOverlay.classList.add('hidden');
+                        resultsArea.classList.remove('hidden');
+                        resultsArea.classList.add('fade-in');
+                    } catch (innerErr) {
+                        console.error("Processing Error:", innerErr);
+                        alert("Error processing image: " + innerErr.message);
+                        loadingOverlay.classList.add('hidden');
+                        dropZone.classList.remove('hidden');
+                    }
+                };
+                reader.readAsDataURL(file);
+
+            } catch (err) {
+                console.error("File Reading Error:", err);
+                alert("Error reading file.");
+                loadingOverlay.classList.add('hidden');
+                dropZone.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
