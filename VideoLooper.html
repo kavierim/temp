@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video-Audio Loop-Merger</title>
+    <meta name="description" content="Merge audio and video files into a seamless loop directly in your browser. Create looping videos easily.">
+    <meta name="author" content="Kari Vierimaa">
+    <link rel="canonical" href="https://kavierim.github.io/temp/VideoLooper.html">
+    <meta property="og:title" content="Video Audio Loop Merger">
+    <meta property="og:description" content="Create perfect video loops with audio in your browser.">
+    <meta property="og:url" content="https://kavierim.github.io/temp/VideoLooper.html">
+    <meta property="og:type" content="website">
     <!-- 1. Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 2. Use the Inter font family -->
@@ -63,6 +70,14 @@
                     <span id="audio-status" class="text-sm text-gray-500 italic">No MP3 file selected</span>
                 </div>
             </div>
+
+            <!-- New: Option to remove last frame -->
+            <div class="mt-4 flex items-center justify-center">
+                <input id="remove-last-frame" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                <label for="remove-last-frame" class="ml-2 block text-sm text-gray-700">
+                    Remove last frame from video loop (for smoother loops)
+                </label>
+            </div>
         </div>
 
         <!-- 
@@ -104,7 +119,7 @@
       - source-video: Plays the looping MP4 (muted).
       - render-canvas: Frames from 'source-video' are drawn here to create a stream.
     -->
-    <video id="source-video" loop muted class="hidden"></video>
+    <video id="source-video" muted class="hidden"></video>
     <canvas id="render-canvas" class="hidden"></canvas>
 
 
@@ -122,6 +137,7 @@
         const videoStatusUI = document.getElementById('video-status-ui');
         const audioStatusUI = document.getElementById('audio-status-ui');
         const videoStatus = document.getElementById('video-status');
+        const removeLastFrameCheckbox = document.getElementById('remove-last-frame');
         const audioStatus = document.getElementById('audio-status');
 
         // State 2: Processing
@@ -262,6 +278,21 @@
                 await new Promise(resolve => {
                     sourceVideo.onloadedmetadata = () => resolve();
                 });
+
+                // --- Handle video looping logic ---
+                const removeLastFrame = removeLastFrameCheckbox.checked;
+                if (removeLastFrame) {
+                    sourceVideo.loop = false; // Disable native loop
+                    const frameDuration = 1 / 30; // Assuming 30fps for frame skipping
+                    const loopThreshold = sourceVideo.duration - frameDuration;
+                    sourceVideo.addEventListener('timeupdate', () => {
+                        if (sourceVideo.currentTime >= loopThreshold) {
+                            sourceVideo.currentTime = 0;
+                        }
+                    });
+                } else {
+                    sourceVideo.loop = true; // Use native loop
+                }
                 
                 // Set canvas to match video dimensions
                 canvas.width = sourceVideo.videoWidth;
@@ -367,4 +398,3 @@
     </script>
 </body>
 </html>
-
