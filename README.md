@@ -8,7 +8,7 @@ This repository contains various small code trials and experiments. It serves as
 - [PyScript Example](https://kavierim.github.io/temp/PyScript.html): A demonstration of running Python in the browser using PyScript
 - [Maastokartta](https://kavierim.github.io/temp/maastokartta.html): A topographic map visualization project
 - [Video-Audio Loop-Merger](https://kavierim.github.io/temp/VideoLooper.html): Loop a video for the full duration of an audio track. Runs 100% in your browser.
- - [Motion Magnifier](https://kavierim.github.io/temp/Motion_Magnifier.html): Real-time webcam motion magnification tool (Eulerian Video Magnification) that amplifies sub-pixel movements and vibrations in the browser.
+- [Motion Magnifier](https://kavierim.github.io/temp/Motion_Magnifier.html): Real-time webcam motion magnification tool (Eulerian Video Magnification) that amplifies sub-pixel movements and vibrations in the browser.
 - [Last Frame Extractor](https://kavierim.github.io/temp/LastFrameExtractor.html): Extract the last frame of a video as an image. Runs 100% in your browser.
 - [Chatbot](https://kavierim.github.io/temp/Chatbot.html): A browser-based chatbot using Transformers.js.
 - [Image to HTML Generator](https://kavierim.github.io/temp/Image2HTML.html): Convert an image into an HTML page using a local model. Runs 100% in your browser.
@@ -16,9 +16,7 @@ This repository contains various small code trials and experiments. It serves as
 - [Viikkokalenteri](https://kavierim.github.io/temp/Viikkokalenteri.html): A Finnish weekly calendar with name days, holidays, and weather information.
 - [PDF Converter](https://kavierim.github.io/temp/PDFConverter.html): Local PDF to Markdown/LaTeX converter (client-side, no uploads).
 - [Background Remove](https://kavierim.github.io/temp/Background_Remove.html): Remove the background from an image. Runs 100% in your browser.
-- [Voxel Engine](https://kavierim.github.io/temp/VoxelEngine.html): A voxel engine in HTML/JavaScript.
 - [Pyscript Hello](https://kavierim.github.io/temp/pyscript_hello.py): A "hello world" example for PyScript.
-- [TTS](https://kavierim.github.io/temp/tts.py): A Python script for Text-to-Speech.
 
 ## How to Use
 
@@ -31,7 +29,6 @@ https://kavierim.github.io/temp/[filename].html
 For example:
 
 - https://kavierim.github.io/temp/Viikkokalenteri.html
-
 
 ## Contributing
 
