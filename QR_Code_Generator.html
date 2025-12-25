@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator - Free, Fast & Customizable</title>
+    
+    <!-- SEO & Metadata -->
+    <meta name="description" content="Generate free, custom QR codes instantly. High-quality, fast, and secure QR code generator for URLs and text. Created by Kari Vierimaa.">
+    <meta name="keywords" content="QR code generator, free QR code, create QR code, online QR maker, Kari Vierimaa, custom QR code, fast QR generator">
+    <meta name="author" content="Kari Vierimaa">
+    <link rel="canonical" href="https://kavierim.github.io/temp/QR_Code_Generator.html">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="QR Code Generator - Free & Fast">
+    <meta property="og:description" content="Generate free custom QR codes instantly. Fast, secure, and easy to use. Created by Kari Vierimaa.">
+    <meta property="og:url" content="https://kavierim.github.io/temp/QR_Code_Generator.html">
+    <meta property="og:type" content="website">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Smooth transition for the QR container */
+        #qrcode img {
+            display: block;
+            margin: auto;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <nav class="w-full bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                    <i class="fa-solid fa-qrcode"></i>
+                </div>
+                <h1 class="text-xl font-bold text-blue-600">
+                    QR Code Generator
+                </h1>
+            </div>
+            <a href="#" class="text-slate-500 hover:text-blue-600 transition-colors text-sm font-medium">
+                Simple. Fast. Free.
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex items-center justify-center p-4 sm:p-8">
+        <div class="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            
+            <!-- Controls Section -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2">Generate QR Code</h2>
+                    <p class="text-slate-500 text-sm">Enter your URL or text below to instantly generate a QR code.</p>
+                </div>
+
+                <!-- Input Group -->
+                <div class="space-y-4">
+                    <div>
+                        <label for="qr-text" class="block text-sm font-medium text-slate-700 mb-1">Content</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-link text-slate-400"></i>
+                            </div>
+                            <input type="text" id="qr-text" 
+                                class="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl leading-5 bg-slate-50 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 sm:text-sm" 
+                                placeholder="https://kavierim.github.io/temp/QR_Code_Generator.html" value="https://kavierim.github.io/temp/QR_Code_Generator.html">
+                        </div>
+                    </div>
+
+                    <!-- Customization Options -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="color-dark" class="block text-sm font-medium text-slate-700 mb-1">Dark Color</label>
+                            <div class="flex items-center gap-2 p-2 border border-slate-200 rounded-xl bg-slate-50">
+                                <input type="color" id="color-dark" value="#000000" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0">
+                                <span class="text-xs text-slate-500 font-mono" id="color-dark-hex">#000000</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="color-light" class="block text-sm font-medium text-slate-700 mb-1">Light Color</label>
+                            <div class="flex items-center gap-2 p-2 border border-slate-200 rounded-xl bg-slate-50">
+                                <input type="color" id="color-light" value="#ffffff" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent p-0">
+                                <span class="text-xs text-slate-500 font-mono" id="color-light-hex">#FFFFFF</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="pt-4 flex gap-3">
+                    <button id="download-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transform active:scale-95">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Download PNG</span>
+                    </button>
+                    <button id="reset-btn" class="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-colors font-medium">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="flex flex-col items-center justify-center">
+                <div class="relative group">
+                    <!-- Decorational background blobs -->
+                    <div class="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+                    
+                    <div class="relative bg-white p-8 rounded-[1.75rem] shadow-xl border border-slate-100 flex items-center justify-center" style="min-width: 300px; min-height: 300px;">
+                        <div id="qrcode" class="opacity-0 transition-opacity duration-500"></div>
+                        
+                        <!-- Loading State (Hidden by default) -->
+                        <div id="loading" class="absolute inset-0 flex items-center justify-center bg-white rounded-[1.75rem] hidden">
+                            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <p class="mt-6 text-center text-slate-500 text-sm max-w-xs">
+                    Scan this code with your phone camera to see the result immediately.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-6 text-center text-slate-400 text-sm">
+        <p>&copy; 2025 QR Code Generator by Kari Vierimaa. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // DOM Elements
+        const qrInput = document.getElementById('qr-text');
+        const colorDarkInput = document.getElementById('color-dark');
+        const colorLightInput = document.getElementById('color-light');
+        const colorDarkHex = document.getElementById('color-dark-hex');
+        const colorLightHex = document.getElementById('color-light-hex');
+        const qrContainer = document.getElementById('qrcode');
+        const downloadBtn = document.getElementById('download-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const loading = document.getElementById('loading');
+
+        let qrcodeObj = null;
+        let generationTimeout = null;
+
+        // Initialize
+        function init() {
+            generateQR();
+            
+            // Event Listeners
+            qrInput.addEventListener('input', debounce(generateQR, 300));
+            
+            colorDarkInput.addEventListener('input', (e) => {
+                colorDarkHex.textContent = e.target.value.toUpperCase();
+                generateQR();
+            });
+            
+            colorLightInput.addEventListener('input', (e) => {
+                colorLightHex.textContent = e.target.value.toUpperCase();
+                generateQR();
+            });
+
+            downloadBtn.addEventListener('click', downloadQR);
+            resetBtn.addEventListener('click', resetDefaults);
+        }
+
+        // Generate QR Code
+        function generateQR() {
+            const text = qrInput.value.trim();
+            const colorDark = colorDarkInput.value;
+            const colorLight = colorLightInput.value;
+
+            // Clear any pending generation to prevent duplicates
+            if (generationTimeout) {
+                clearTimeout(generationTimeout);
+            }
+
+            if (!text) {
+                qrContainer.innerHTML = '';
+                return;
+            }
+
+            // Clear previous QR code immediately
+            qrContainer.innerHTML = '';
+            qrContainer.classList.remove('opacity-100');
+            
+            // Simple animation effect
+            loading.classList.remove('hidden');
+
+            // Slight delay to allow UI to breathe/show loading state if needed
+            generationTimeout = setTimeout(() => {
+                // Double check container is clear before appending (extra safety)
+                qrContainer.innerHTML = '';
+                
+                qrcodeObj = new QRCode(qrContainer, {
+                    text: text,
+                    width: 256,
+                    height: 256,
+                    colorDark : colorDark,
+                    colorLight : colorLight,
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+
+                loading.classList.add('hidden');
+                
+                // Trigger reflow/fade-in
+                requestAnimationFrame(() => {
+                    qrContainer.classList.add('opacity-100');
+                });
+            }, 100);
+        }
+
+        // Download Function
+        function downloadQR() {
+            const img = qrContainer.querySelector('img');
+            if (img && img.src) {
+                // Create a temporary link
+                const link = document.createElement('a');
+                link.download = 'qrcode.png';
+                link.href = img.src;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert("Please generate a QR code first!");
+            }
+        }
+
+        // Reset Function
+        function resetDefaults() {
+            qrInput.value = "https://kavierim.github.io/temp/QR_Code_Generator.html";
+            colorDarkInput.value = "#000000";
+            colorLightInput.value = "#ffffff";
+            colorDarkHex.textContent = "#000000";
+            colorLightHex.textContent = "#FFFFFF";
+            generateQR();
+        }
+
+        // Debounce utility to prevent too many renders while typing
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Run on load
+        window.onload = init;
+
+    </script>
+</body>
+</html>

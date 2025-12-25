@@ -17,6 +17,7 @@ This repository contains various small code trials and experiments. It serves as
 - [PDF Converter](https://kavierim.github.io/temp/PDFConverter.html): Local PDF to Markdown/LaTeX converter (client-side, no uploads).
 - [Background Remove](https://kavierim.github.io/temp/Background_Remove.html): Remove the background from an image. Runs 100% in your browser.
 - [Pyscript Hello](https://kavierim.github.io/temp/pyscript_hello.py): A "hello world" example for PyScript.
+- [QR Code Generator](https://kavierim.github.io/temp/QR_Code_Generator.html): Generate free, custom QR codes instantly.
 
 ## How to Use
 
