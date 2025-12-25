@@ -15,6 +15,10 @@ This repository contains various small code trials and experiments. It serves as
 - [Text to Speech](https://kavierim.github.io/temp/TextToSpeech.html): Generate speech from text directly in your browser using Transformers.js.
 - [Viikkokalenteri](https://kavierim.github.io/temp/Viikkokalenteri.html): A Finnish weekly calendar with name days, holidays, and weather information.
 - [PDF Converter](https://kavierim.github.io/temp/PDFConverter.html): Local PDF to Markdown/LaTeX converter (client-side, no uploads).
+- [Background Remove](https://kavierim.github.io/temp/Background_Remove.html): Remove the background from an image. Runs 100% in your browser.
+- [Voxel Engine](https://kavierim.github.io/temp/VoxelEngine.html): A voxel engine in HTML/JavaScript.
+- [Pyscript Hello](https://kavierim.github.io/temp/pyscript_hello.py): A "hello world" example for PyScript.
+- [TTS](https://kavierim.github.io/temp/tts.py): A Python script for Text-to-Speech.
 
 ## How to Use
 
