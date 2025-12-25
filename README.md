@@ -5,46 +5,46 @@ This repository contains various small code trials and experiments. It serves as
 ## Current Projects
 
 - **[Fluid Simulation](https://kavierim.github.io/temp/FluidSimulation.html)**: An interactive fluid dynamics simulator in HTML/JavaScript
-  ![Fluid Simulation Preview](./og/FluidSimulation_og.png | width=100)
+  <a href=""><img src="./og/FluidSimulation_og.png" width="100" alt="Fluid Simulation Preview"></a>
 
 - **[PyScript Example](https://kavierim.github.io/temp/PyScript.html)**: A demonstration of running Python in the browser using PyScript
-  ![PyScript Example Preview](./og/PyScript_og.png | width=100)
+  <a href=""><img src="./og/PyScript_og.png" width="100" alt="PyScript Example Preview"></a>
 
 - **[Maastokartta](https://kavierim.github.io/temp/maastokartta.html)**: A topographic map visualization project
-  ![Maastokartta Preview](./og/maastokartta_og.png | width=100)
+  <a href=""><img src="./og/maastokartta_og.png" width="100" alt="Maastokartta Preview"></a>
 
 - **[Video-Audio Loop-Merger](https://kavierim.github.io/temp/VideoLooper.html)**: Loop a video for the full duration of an audio track. Runs 100% in your browser.
-  ![Video-Audio Loop-Merger Preview](./og/VideoLooper_og.png | width=100)
+  <a href=""><img src="./og/VideoLooper_og.png" width="100" alt="Video-Audio Loop-Merger Preview"></a>
 
 - **[Motion Magnifier](https://kavierim.github.io/temp/Motion_Magnifier.html)**: Real-time webcam motion magnification tool (Eulerian Video Magnification) that amplifies sub-pixel movements and vibrations in the browser.
-  ![Motion Magnifier Preview](./og/Motion_Magnifier_og.png | width=100)
+  <a href=""><img src="./og/Motion_Magnifier_og.png" width="100" alt="Motion Magnifier Preview"></a>
 
 - **[Last Frame Extractor](https://kavierim.github.io/temp/LastFrameExtractor.html)**: Extract the last frame of a video as an image. Runs 100% in your browser.
-  ![Last Frame Extractor Preview](./og/LastFrameExtractor_og.png | width=100)
+  <a href=""><img src="./og/LastFrameExtractor_og.png" width="100" alt="Last Frame Extractor Preview"></a>
 
 - **[Chatbot](https://kavierim.github.io/temp/Chatbot.html)**: A browser-based chatbot using Transformers.js.
-  ![Chatbot Preview](./og/Chatbot_og.png | width=100)
+  <a href=""><img src="./og/Chatbot_og.png" width="100" alt="Chatbot Preview"></a>
 
 - **[Image to HTML Generator](https://kavierim.github.io/temp/Image2HTML.html)**: Convert an image into an HTML page using a local model. Runs 100% in your browser.
-  ![Image to HTML Generator Preview](./og/Image2HTML_og.png | width=100)
+  <a href=""><img src="./og/Image2HTML_og.png" width="100" alt="Image to HTML Generator Preview"></a>
 
 - **[Text to Speech](https://kavierim.github.io/temp/TextToSpeech.html)**: Generate speech from text directly in your browser using Transformers.js.
-  ![Text to Speech Preview](./og/TextToSpeech_og.png | width=100)
+  <a href=""><img src="./og/TextToSpeech_og.png" width="100" alt="Text to Speech Preview"></a>
 
 - **[Viikkokalenteri](https://kavierim.github.io/temp/Viikkokalenteri.html)**: A Finnish weekly calendar with name days, holidays, and weather information.
-  ![Viikkokalenteri Preview](./og/Viikkokalenteri_og.png | width=100)
+  <a href=""><img src="./og/Viikkokalenteri_og.png" width="100" alt="Viikkokalenteri Preview"></a>
 
 - **[PDF Converter](https://kavierim.github.io/temp/PDFConverter.html)**: Local PDF to Markdown/LaTeX converter (client-side, no uploads).
-  ![PDF Converter Preview](./og/PDFConverter_og.png | width=100)
+  <a href=""><img src="./og/PDFConverter_og.png" width="100" alt="PDF Converter Preview"></a>
 
 - **[Background Remove](https://kavierim.github.io/temp/Background_Remove.html)**: Remove the background from an image. Runs 100% in your browser.
-  ![Background Remove Preview](./og/Background_Remove_og.png | width=100)
+  <a href=""><img src="./og/Background_Remove_og.png" width="100" alt="Background Remove Preview"></a>
 
 - **[Pyscript Hello](https://kavierim.github.io/temp/pyscript_hello.py)**: A "hello world" example for PyScript.
-  ![Pyscript Hello Preview](./og/pyscript_hello_og.png | width=100)
+  <a href=""><img src="./og/pyscript_hello_og.png" width="100" alt="Pyscript Hello Preview"></a>
 
 - **[QR Code Generator](https://kavierim.github.io/temp/QR_Code_Generator.html)**: Generate free, custom QR codes instantly.
-  ![QR Code Generator Preview](./og/QR_Code_Generator_og.png | width=100)
+  <a href=""><img src="./og/QR_Code_Generator_og.png" width="100" alt="QR Code Generator Preview"></a>
 
 ## How to Use
 
