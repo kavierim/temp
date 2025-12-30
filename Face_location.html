@@ -2,88 +2,137 @@
 <html lang="fi">
 <head>
   <meta charset="UTF-8">
-  <title>Kasvojen 3D-seuranta</title>
+  <title>3D Face Mesh - Three.js</title>
   <style>
-    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #222; color: white; }
-    canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; }
-    video { display: none; } /* Piilotetaan raaka video, piirretään kankaalle */
-    
-    #status {
-      position: fixed; top: 20px; left: 20px; z-index: 10;
-      background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 8px;
-    }
-    .data-row { margin-bottom: 5px; font-family: monospace; font-size: 1.2em; }
+    body { margin: 0; overflow: hidden; background-color: #111; color: white; font-family: sans-serif; }
+    #container { width: 100vw; height: 100vh; }
+    /* Piilotetaan video elementti, koska emme halua nähdä sitä */
+    video { display: none; }
+    #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; pointer-events: none; }
   </style>
-  
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-  <div id="status">
-    <h3>Nenänpään sijainti:</h3>
-    <div class="data-row">X: <span id="posX">0</span></div>
-    <div class="data-row">Y: <span id="posY">0</span></div>
-    <div class="data-row">Z: <span id="posZ">0</span> (Arvioitu syvyys)</div>
-  </div>
-
+  <div id="loading">Ladataan tekoälymalleja ja käynnistetään kameraa...</div>
+  <div id="container"></div>
   <video id="input_video"></video>
-  <canvas id="output_canvas"></canvas>
 
-  <script>
-    const videoElement = document.getElementById('input_video');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasCtx = canvasElement.getContext('2d');
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- 1. THREE.JS ALUSTUS (3D-MAAILMA) ---
     
-    const textX = document.getElementById('posX');
-    const textY = document.getElementById('posY');
-    const textZ = document.getElementById('posZ');
+    const container = document.getElementById('container');
+    
+    // Luodaan scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+    
+    // Lisätään apuruudukko (lattia) hahmottamista varten
+    const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+    gridHelper.position.y = -2;
+    scene.add(gridHelper);
+
+    // Luodaan "Main Camera" (se millä käyttäjä katsoo 3D-maailmaa)
+    const viewCamera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    viewCamera.position.set(0, 0, 5); // Asetetaan katselukamera kauemmas
+
+    // Renderöijä
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
+
+    // Hiirikontrollit (OrbitControls)
+    const controls = new OrbitControls(viewCamera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // --- 2. OBJEKTIEN LUOMINEN ---
+
+    // A. Fyysinen web-kamera (Visualisointi)
+    // Tehdään siitä vihreä kartio, joka osoittaa kasvoja kohti
+    const camGeometry = new THREE.ConeGeometry(0.2, 0.5, 32);
+    camGeometry.rotateX(Math.PI / 2); // Käännetään osoittamaan Z-akselia pitkin
+    const camMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+    const physicalCamera = new THREE.Mesh(camGeometry, camMaterial);
+    physicalCamera.position.set(0, 0, 0); // Kamera on origossa
+    scene.add(physicalCamera);
+
+    // Lisätään teksti "Webcam" (yksinkertaistettu ilman font loaderia piirtämällä viivaa tai vain ymmärtämällä konteksti)
+    
+    // B. Kasvot (Pistepilvi / Mesh)
+    // MediaPipe palauttaa 468 pistettä.
+    const pointCount = 468;
+    const geometry = new THREE.BufferGeometry();
+    
+    // Alustetaan tyhjät positiot
+    const positions = new Float32Array(pointCount * 3);
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    
+    const material = new THREE.PointsMaterial({ 
+      color: 0x00ffff, 
+      size: 0.05, 
+      sizeAttenuation: true 
+    });
+    
+    const facePoints = new THREE.Points(geometry, material);
+    scene.add(facePoints);
+
+    // --- 3. MEDIAPIPE LOGIIKKA ---
+
+    const videoElement = document.getElementById('input_video');
+    const loadingText = document.getElementById('loading');
 
     function onResults(results) {
-      // Asetetaan kankaan koko vastaamaan videota
-      canvasElement.width = videoElement.videoWidth;
-      canvasElement.height = videoElement.videoHeight;
+      loadingText.style.display = 'none';
 
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      
-      // Piirretään kamerakuva taustalle
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+        const landmarks = results.multiFaceLandmarks[0];
+        
+        // Päivitetään 3D-pisteiden sijainnit
+        const positions = facePoints.geometry.attributes.position.array;
 
-      if (results.multiFaceLandmarks) {
-        for (const landmarks of results.multiFaceLandmarks) {
-          
-          // Piirretään kasvojen verkko (valinnainen)
-          drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, 
-                         {color: '#C0C0C070', lineWidth: 1});
-          
-          // Otetaan nenänpää (indeksi 1 on yleensä nenänpää MediaPipessa)
-          const nose = landmarks[1];
-          
-          // Päivitetään HTML arvot
-          // Arvot ovat normalisoituja (0.0 - 1.0), kerrotaan pikseleiksi jos halutaan
-          textX.innerText = nose.x.toFixed(4); 
-          textY.innerText = nose.y.toFixed(4);
-          
-          // Z on suhteellinen arvo. Negatiivinen on lähempänä kameraa.
-          textZ.innerText = nose.z.toFixed(4);
+        // Skaalauskerroin (muutetaan MediaPipe 0-1 arvot isommiksi 3D-yksiköiksi)
+        const scale = 5; 
 
-          // Piirretään punainen piste nenän päähän
-          const x = nose.x * canvasElement.width;
-          const y = nose.y * canvasElement.height;
+        for (let i = 0; i < landmarks.length; i++) {
+          const lm = landmarks[i];
           
-          canvasCtx.beginPath();
-          canvasCtx.arc(x, y, 10, 0, 2 * Math.PI);
-          canvasCtx.fillStyle = "red";
-          canvasCtx.fill();
+          // MediaPipe X/Y: 0.0 - 1.0. 
+          // Muutetaan: 0.5 on keskellä (0,0,0).
+          // Käännetään X (peilikuva) ja Y (koska 3D:ssä Y+ on ylös, kuvassa Y+ on alas).
+          
+          const x = (0.5 - lm.x) * scale; 
+          const y = (0.5 - lm.y) * scale; // Käännetään Y
+          
+          // Z on MediaPipessa suhteellinen kasvojen kokoon.
+          // Skaalataan sitä hieman voimakkaammin, jotta syvyysvaikutelma erottuu.
+          // Lisätään offset, jotta kasvot eivät ole kameran sisällä vaan sen edessä.
+          const z = -lm.z * scale - 2; // -2 siirtää kasvot 2 yksikköä poispäin kamerasta
+
+          positions[i * 3] = x;
+          positions[i * 3 + 1] = y;
+          positions[i * 3 + 2] = z;
         }
+        
+        // Kerrotaan Three.js:lle että geometria on muuttunut
+        facePoints.geometry.attributes.position.needsUpdate = true;
       }
-      canvasCtx.restore();
     }
 
-    // Alustetaan FaceMesh
     const faceMesh = new FaceMesh({locateFile: (file) => {
       return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
     }});
@@ -97,7 +146,6 @@
 
     faceMesh.onResults(onResults);
 
-    // Käynnistetään kamera
     const camera = new Camera(videoElement, {
       onFrame: async () => {
         await faceMesh.send({image: videoElement});
@@ -106,6 +154,24 @@
       height: 720
     });
     camera.start();
+
+    // --- 4. RENDERÖINTILOOPPI ---
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update(); // Päivitetään hiirikontrollit
+      renderer.render(scene, viewCamera);
+    }
+    
+    // Käsitellään ikkunan koon muutos
+    window.addEventListener('resize', () => {
+        viewCamera.aspect = window.innerWidth / window.innerHeight;
+        viewCamera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+
   </script>
 </body>
 </html>
