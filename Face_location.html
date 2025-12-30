@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <title>Kasvojen 3D-seuranta</title>
+  <style>
+    body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background: #222; color: white; }
+    canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 1; }
+    video { display: none; } /* Piilotetaan raaka video, piirretään kankaalle */
+    
+    #status {
+      position: fixed; top: 20px; left: 20px; z-index: 10;
+      background: rgba(0, 0, 0, 0.7); padding: 15px; border-radius: 8px;
+    }
+    .data-row { margin-bottom: 5px; font-family: monospace; font-size: 1.2em; }
+  </style>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <div id="status">
+    <h3>Nenänpään sijainti:</h3>
+    <div class="data-row">X: <span id="posX">0</span></div>
+    <div class="data-row">Y: <span id="posY">0</span></div>
+    <div class="data-row">Z: <span id="posZ">0</span> (Arvioitu syvyys)</div>
+  </div>
+
+  <video id="input_video"></video>
+  <canvas id="output_canvas"></canvas>
+
+  <script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    
+    const textX = document.getElementById('posX');
+    const textY = document.getElementById('posY');
+    const textZ = document.getElementById('posZ');
+
+    function onResults(results) {
+      // Asetetaan kankaan koko vastaamaan videota
+      canvasElement.width = videoElement.videoWidth;
+      canvasElement.height = videoElement.videoHeight;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      
+      // Piirretään kamerakuva taustalle
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.multiFaceLandmarks) {
+        for (const landmarks of results.multiFaceLandmarks) {
+          
+          // Piirretään kasvojen verkko (valinnainen)
+          drawConnectors(canvasCtx, landmarks, FACEMESH_TESSELATION, 
+                         {color: '#C0C0C070', lineWidth: 1});
+          
+          // Otetaan nenänpää (indeksi 1 on yleensä nenänpää MediaPipessa)
+          const nose = landmarks[1];
+          
+          // Päivitetään HTML arvot
+          // Arvot ovat normalisoituja (0.0 - 1.0), kerrotaan pikseleiksi jos halutaan
+          textX.innerText = nose.x.toFixed(4); 
+          textY.innerText = nose.y.toFixed(4);
+          
+          // Z on suhteellinen arvo. Negatiivinen on lähempänä kameraa.
+          textZ.innerText = nose.z.toFixed(4);
+
+          // Piirretään punainen piste nenän päähän
+          const x = nose.x * canvasElement.width;
+          const y = nose.y * canvasElement.height;
+          
+          canvasCtx.beginPath();
+          canvasCtx.arc(x, y, 10, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = "red";
+          canvasCtx.fill();
+        }
+      }
+      canvasCtx.restore();
+    }
+
+    // Alustetaan FaceMesh
+    const faceMesh = new FaceMesh({locateFile: (file) => {
+      return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+    }});
+
+    faceMesh.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    faceMesh.onResults(onResults);
+
+    // Käynnistetään kamera
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await faceMesh.send({image: videoElement});
+      },
+      width: 1280,
+      height: 720
+    });
+    camera.start();
+  </script>
+</body>
+</html>
